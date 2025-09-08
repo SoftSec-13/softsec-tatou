@@ -57,6 +57,14 @@ repos:
         args: ['--baseline', '.secrets.baseline']
         exclude: .*\.lock$|^\.secrets\.baseline$
 
+  # Dead code detection
+  - repo: https://github.com/jendrikseipp/vulture
+    rev: v2.10
+    hooks:
+      - id: vulture
+        args: [--min-confidence, "80", "server/"]
+        exclude: ^(test/|migrations/|venv/|\.venv/)
+
 # Configuration for specific tools
 default_language_version:
   python: python3.12
