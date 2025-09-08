@@ -87,11 +87,11 @@ def create_app():
 
     # --- Routes ---
     
-    @app.route("/<path:filename>")
+    # @app.route("/<path:filename>")
     def static_files(filename):
         return app.send_static_file(filename)
 
-    @app.route("/")
+    # @app.route("/")
     def home():
         return app.send_static_file("index.html")
     
@@ -106,7 +106,7 @@ def create_app():
         return jsonify({"message": "The server is up and running.", "db_connected": db_ok}), 200
 
     # POST /api/create-user {email, login, password}
-    @app.post("/api/create-user")
+    # @app.post("/api/create-user")
     def create_user():
         payload = request.get_json(silent=True) or {}
         email = (payload.get("email") or "").strip().lower()
@@ -136,7 +136,7 @@ def create_app():
         return jsonify({"id": row.id, "email": row.email, "login": row.login}), 201
 
     # POST /api/login {login, password}
-    @app.post("/api/login")
+    # @app.post("/api/login")
     def login():
         payload = request.get_json(silent=True) or {}
         email = (payload.get("email") or "").strip()
@@ -160,7 +160,7 @@ def create_app():
         return jsonify({"token": token, "token_type": "bearer", "expires_in": app.config["TOKEN_TTL_SECONDS"]}), 200
 
     # POST /api/upload-document  (multipart/form-data)
-    @app.post("/api/upload-document")
+    # @app.post("/api/upload-document")
     @require_auth
     def upload_document():
         if "file" not in request.files:
@@ -219,7 +219,7 @@ def create_app():
         }), 201
 
     # GET /api/list-documents
-    @app.get("/api/list-documents")
+    # @app.get("/api/list-documents")
     @require_auth
     def list_documents():
         try:
@@ -248,8 +248,8 @@ def create_app():
 
 
     # GET /api/list-versions
-    @app.get("/api/list-versions")
-    @app.get("/api/list-versions/<int:document_id>")
+    # @app.get("/api/list-versions")
+    # @app.get("/api/list-versions/<int:document_id>")
     @require_auth
     def list_versions(document_id: int | None = None):
         # Support both path param and ?id=/ ?documentid=
@@ -287,7 +287,7 @@ def create_app():
     
     
     # GET /api/list-all-versions
-    @app.get("/api/list-all-versions")
+    # @app.get("/api/list-all-versions")
     @require_auth
     def list_all_versions():
         try:
@@ -315,8 +315,8 @@ def create_app():
         return jsonify({"versions": versions}), 200
     
     # GET /api/get-document or /api/get-document/<id>  → returns the PDF (inline)
-    @app.get("/api/get-document")
-    @app.get("/api/get-document/<int:document_id>")
+    # @app.get("/api/get-document")
+    # @app.get("/api/get-document/<int:document_id>")
     @require_auth
     def get_document(document_id: int | None = None):
     
@@ -376,7 +376,7 @@ def create_app():
         return resp
     
     # GET /api/get-version/<link>  → returns the watermarked PDF (inline)
-    @app.get("/api/get-version/<link>")
+    # @app.get("/api/get-version/<link>")
     def get_version(link: str):
         
         try:
@@ -442,8 +442,8 @@ def create_app():
         return fp
 
     # DELETE /api/delete-document  (and variants)
-    @app.route("/api/delete-document", methods=["DELETE", "POST"])  # POST supported for convenience
-    @app.route("/api/delete-document/<document_id>", methods=["DELETE"])
+    # @app.route("/api/delete-document", methods=["DELETE", "POST"])  # POST supported for convenience
+    # @app.route("/api/delete-document/<document_id>", methods=["DELETE"])
     def delete_document(document_id: int | None = None):
         # accept id from path, query (?id= / ?documentid=), or JSON body on POST
         if not document_id:
@@ -510,8 +510,8 @@ def create_app():
         
         
     # POST /api/create-watermark or /api/create-watermark/<id>  → create watermarked pdf and returns metadata
-    @app.post("/api/create-watermark")
-    @app.post("/api/create-watermark/<int:document_id>")
+    # @app.post("/api/create-watermark")
+    # @app.post("/api/create-watermark/<int:document_id>")
     @require_auth
     def create_watermark(document_id: int | None = None):
         # accept id from path, query (?id= / ?documentid=), or JSON body on GET
@@ -656,7 +656,7 @@ def create_app():
         }), 201
         
         
-    @app.post("/api/load-plugin")
+    # @app.post("/api/load-plugin")
     @require_auth
     def load_plugin():
         """
@@ -724,7 +724,7 @@ def create_app():
     
     
     # GET /api/get-watermarking-methods -> {"methods":[{"name":..., "description":...}, ...], "count":N}
-    @app.get("/api/get-watermarking-methods")
+    # @app.get("/api/get-watermarking-methods")
     def get_watermarking_methods():
         methods = []
 
@@ -734,8 +734,8 @@ def create_app():
         return jsonify({"methods": methods, "count": len(methods)}), 200
         
     # POST /api/read-watermark
-    @app.post("/api/read-watermark")
-    @app.post("/api/read-watermark/<int:document_id>")
+    # @app.post("/api/read-watermark")
+    # @app.post("/api/read-watermark/<int:document_id>")
     @require_auth
     def read_watermark(document_id: int | None = None):
         # accept id from path, query (?id= / ?documentid=), or JSON body on POST
