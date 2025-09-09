@@ -844,5 +844,5 @@ app = create_app()
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     # Use localhost by default for security, allow override via environment variable
-    host = os.environ.get("HOST", "127.0.0.1")
+    host = os.environ.get("HOST", "0.0.0.0")
     app.run(host=host, port=port)
