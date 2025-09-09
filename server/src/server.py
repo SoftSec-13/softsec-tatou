@@ -122,7 +122,8 @@ def create_app():
             with get_engine().begin() as conn:
                 res = conn.execute(
                     text(
-                        "INSERT INTO Users (email, hpassword, login) VALUES (:email, :hpw, :login)"
+                        "INSERT INTO Users (email, hpassword, login) "
+                        "VALUES (:email, :hpw, :login)"
                     ),
                     {"email": email, "hpw": hpw, "login": login},
                 )
@@ -151,7 +152,8 @@ def create_app():
             with get_engine().connect() as conn:
                 row = conn.execute(
                     text(
-                        "SELECT id, email, login, hpassword FROM Users WHERE email = :email LIMIT 1"
+                        "SELECT id, email, login, hpassword FROM Users "
+                        "WHERE email = :email LIMIT 1"
                     ),
                     {"email": email},
                 ).first()
@@ -291,7 +293,8 @@ def create_app():
                 rows = conn.execute(
                     text(
                         """
-                        SELECT v.id, v.documentid, v.link, v.intended_for, v.secret, v.method
+                        SELECT v.id, v.documentid, v.link, v.intended_for,
+                               v.secret, v.method
                         FROM Users u
                         JOIN Documents d ON d.ownerid = u.id
                         JOIN Versions v ON d.id = v.documentid
@@ -479,11 +482,14 @@ def create_app():
             try:
                 fp.relative_to(storage_root)
             except ValueError:
-                raise RuntimeError(f"path {fp} escapes storage root {storage_root}")
+                raise RuntimeError(
+                    f"path {fp} escapes storage root {storage_root}"
+                ) from None
         return fp
 
     # DELETE /api/delete-document  (and variants)
-    # @app.route("/api/delete-document", methods=["DELETE", "POST"])  # POST supported for convenience
+    # @app.route("/api/delete-document", methods=["DELETE", "POST"])
+    # POST supported for convenience
     # @app.route("/api/delete-document/<document_id>", methods=["DELETE"])
     def delete_document(document_id: int | None = None):
         # accept id from path, query (?id= / ?documentid=), or JSON body on POST
@@ -539,9 +545,10 @@ def create_app():
         # Delete DB row (will cascade to Version if FK has ON DELETE CASCADE)
         try:
             with get_engine().begin() as conn:
-                # If your schema does NOT have ON DELETE CASCADE on Version.documentid,
-                # uncomment the next line first:
-                # conn.execute(text("DELETE FROM Version WHERE documentid = :id"), {"id": doc_id})
+                # If your schema does NOT have ON DELETE CASCADE on
+                # Version.documentid, uncomment the next line first:
+                # conn.execute(text("DELETE FROM Version WHERE documentid = :id"),
+                #              {"id": doc_id})
                 conn.execute(
                     text("DELETE FROM Documents WHERE id = :id"), {"id": doc_id}
                 )
@@ -558,7 +565,8 @@ def create_app():
             }
         ), 200
 
-    # POST /api/create-watermark or /api/create-watermark/<id>  → create watermarked pdf and returns metadata
+    # POST /api/create-watermark or /api/create-watermark/<id>
+    # → create watermarked pdf and returns metadata
     # @app.post("/api/create-watermark")
     # @app.post("/api/create-watermark/<int:document_id>")
     @require_auth
@@ -652,7 +660,7 @@ def create_app():
                 method=method,
                 position=position,
             )
-            if not isinstance(wm_bytes, (bytes, bytearray)) or len(wm_bytes) == 0:
+            if not isinstance(wm_bytes, bytes | bytearray) or len(wm_bytes) == 0:
                 return jsonify({"error": "watermarking produced no output"}), 500
         except Exception as e:
             return jsonify({"error": f"watermarking failed: {e}"}), 500
@@ -681,8 +689,10 @@ def create_app():
                 conn.execute(
                     text(
                         """
-                        INSERT INTO Versions (documentid, link, intended_for, secret, method, position, path)
-                        VALUES (:documentid, :link, :intended_for, :secret, :method, :position, :path)
+                        INSERT INTO Versions (documentid, link, intended_for,
+                                            secret, method, position, path)
+                        VALUES (:documentid, :link, :intended_for, :secret,
+                               :method, :position, :path)
                     """
                     ),
                     {
@@ -731,7 +741,8 @@ def create_app():
             {"error": "Plugin loading is disabled for security reasons"}
         ), 501
 
-    # GET /api/get-watermarking-methods -> {"methods":[{"name":..., "description":...}, ...], "count":N}
+    # GET /api/get-watermarking-methods
+    # → {"methods":[{"name":..., "description":...}, ...], "count":N}
     # @app.get("/api/get-watermarking-methods")
     def get_watermarking_methods():
         methods = []

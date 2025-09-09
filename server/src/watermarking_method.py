@@ -43,13 +43,13 @@ from __future__ import annotations
 
 import os
 from abc import ABC, abstractmethod
-from typing import IO, ClassVar, TypeAlias
+from typing import IO, ClassVar
 
 # ----------------------------
 # Public type aliases & errors
 # ----------------------------
 
-PdfSource: TypeAlias = bytes | str | os.PathLike[str] | IO[bytes]
+type PdfSource = bytes | str | os.PathLike[str] | IO[bytes]
 #: Accepted input type for a PDF document.
 #:
 #: Implementations should *not* assume the input is a file path; always call
@@ -95,9 +95,9 @@ def load_pdf_bytes(src: PdfSource) -> bytes:
     ValueError
         If the resolved bytes do not appear to be a PDF file.
     """
-    if isinstance(src, (bytes, bytearray)):
+    if isinstance(src, bytes | bytearray):
         data = bytes(src)
-    elif isinstance(src, (str, os.PathLike)):
+    elif isinstance(src, str | os.PathLike):
         with open(os.fspath(src), "rb") as fh:
             data = fh.read()
     elif hasattr(src, "read"):

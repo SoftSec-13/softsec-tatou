@@ -83,7 +83,7 @@ class TestAllWatermarkingMethods:
         out_bytes = wm_impl.add_watermark(
             sample_pdf_path, secret=secret, key=key, position=None
         )
-        assert isinstance(out_bytes, (bytes, bytearray)), (  # nosec B101
+        assert isinstance(out_bytes, bytes | bytearray), (  # nosec B101
             f"{method_name}: add_watermark must return bytes"
         )
         assert len(out_bytes) >= len(original), (  # nosec B101

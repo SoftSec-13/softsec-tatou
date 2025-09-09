@@ -36,6 +36,19 @@ pdfwm = "watermarking_cli:main"                 # now you can run `pdfwm methods
 line-length = 88
 target-version = "py312"
 
+# Exclude directories
+exclude = [
+    ".git",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".venv",
+    "__pycache__",
+    "migrations",
+    "venv",
+    "env",
+]
+
+[tool.ruff.lint]
 # Enable specific rule sets
 select = [
     "E",   # pycodestyle errors
@@ -56,19 +69,7 @@ ignore = [
     "S101",  # Use of assert (common in tests)
 ]
 
-# Exclude directories
-exclude = [
-    ".git",
-    ".mypy_cache",
-    ".ruff_cache",
-    ".venv",
-    "__pycache__",
-    "migrations",
-    "venv",
-    "env",
-]
-
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 # Ignore security rules in test files
 "test/**/*.py" = ["S101", "S106", "S108"]
 # Ignore import rules in __init__.py files
@@ -76,10 +77,10 @@ exclude = [
 # Ignore security rules in config files
 "config.py" = ["S105", "S106"]
 
-[tool.ruff.mccabe]
+[tool.ruff.lint.mccabe]
 max-complexity = 10
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 known-first-party = ["tatou_server"]  # Adjust based on your main module name
 split-on-trailing-comma = true
 
