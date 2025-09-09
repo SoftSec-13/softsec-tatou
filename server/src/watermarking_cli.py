@@ -115,7 +115,8 @@ def cmd_embed(args: argparse.Namespace) -> int:
         method=args.method, pdf=args.input, position=args.position
     ):
         print(
-            f"Method {args.method} is not applicable on {args.output} at {args.position}."
+            f"Method {args.method} is not applicable on {args.output} at "
+            f"{args.position}."
         )
         return 5
 

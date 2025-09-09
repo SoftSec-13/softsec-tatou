@@ -68,7 +68,10 @@ class AddAfterEOF(WatermarkingMethod):
 
     @staticmethod
     def get_usage() -> str:
-        return "Toy method that appends a watermark record after the PDF EOF. Position is ignored."
+        return (
+            "Toy method that appends a watermark record after the PDF EOF. "
+            "Position is ignored."
+        )
 
     def add_watermark(
         self,
@@ -141,7 +144,7 @@ class AddAfterEOF(WatermarkingMethod):
             raise SecretNotFoundError("Unsupported watermark version or format")
         if payload.get("alg") != "HMAC-SHA256":
             raise WatermarkingError(
-                "Unsupported MAC algorithm: %r" % payload.get("alg")
+                f"Unsupported MAC algorithm: {payload.get('alg')!r}"
             )
 
         try:

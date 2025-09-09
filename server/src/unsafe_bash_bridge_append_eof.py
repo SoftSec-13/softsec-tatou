@@ -28,7 +28,10 @@ class UnsafeBashBridgeAppendEOF(WatermarkingMethod):
 
     @staticmethod
     def get_usage() -> str:
-        return "Toy method that appends a watermark record after the PDF EOF. Position and key are ignored."
+        return (
+            "Toy method that appends a watermark record after the PDF EOF. "
+            "Position and key are ignored."
+        )
 
     def add_watermark(
         self,
