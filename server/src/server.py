@@ -1,19 +1,17 @@
-import os
-import io
-import hashlib
 import datetime as dt
-from pathlib import Path
+import hashlib
+import os
+import pickle as _std_pickle
 from functools import wraps
+from pathlib import Path
 
-from flask import Flask, jsonify, request, g, send_file
-from werkzeug.utils import secure_filename
-from werkzeug.security import generate_password_hash, check_password_hash
-from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
-
+from flask import Flask, g, jsonify, request, send_file
+from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError
+from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.utils import secure_filename
 
-import pickle as _std_pickle
 try:
     import dill as _pickle  # allows loading classes not importable by module path
 except Exception:  # dill is optional
@@ -22,14 +20,18 @@ except Exception:  # dill is optional
 
 import watermarking_utils as WMUtils
 from watermarking_method import WatermarkingMethod
-#from watermarking_utils import METHODS, apply_watermark, read_watermark, explore_pdf, is_watermarking_applicable, get_method
+
+# from watermarking_utils import METHODS, apply_watermark, read_watermark, explore_pdf, is_watermarking_applicable, get_method
+
 
 def create_app():
     app = Flask(__name__)
 
     # --- Config ---
     app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-change-me")
-    app.config["STORAGE_DIR"] = Path(os.environ.get("STORAGE_DIR", "./storage")).resolve()
+    app.config["STORAGE_DIR"] = Path(
+        os.environ.get("STORAGE_DIR", "./storage")
+    ).resolve()
     app.config["TOKEN_TTL_SECONDS"] = int(os.environ.get("TOKEN_TTL_SECONDS", "86400"))
 
     app.config["DB_USER"] = os.environ.get("DB_USER", "tatou")
@@ -69,13 +71,20 @@ def create_app():
                 return _auth_error("Missing or invalid Authorization header")
             token = auth.split(" ", 1)[1].strip()
             try:
-                data = _serializer().loads(token, max_age=app.config["TOKEN_TTL_SECONDS"])
+                data = _serializer().loads(
+                    token, max_age=app.config["TOKEN_TTL_SECONDS"]
+                )
             except SignatureExpired:
                 return _auth_error("Token expired")
             except BadSignature:
                 return _auth_error("Invalid token")
-            g.user = {"id": int(data["uid"]), "login": data["login"], "email": data.get("email")}
+            g.user = {
+                "id": int(data["uid"]),
+                "login": data["login"],
+                "email": data.get("email"),
+            }
             return f(*args, **kwargs)
+
         return wrapper
 
     def _sha256_file(path: Path) -> str:
@@ -86,7 +95,7 @@ def create_app():
         return h.hexdigest()
 
     # --- Routes ---
-    
+
     # @app.route("/<path:filename>")
     def static_files(filename):
         return app.send_static_file(filename)
@@ -94,7 +103,7 @@ def create_app():
     # @app.route("/")
     def home():
         return app.send_static_file("index.html")
-    
+
     @app.get("/healthz")
     def healthz():
         try:
@@ -103,7 +112,9 @@ def create_app():
             db_ok = True
         except Exception:
             db_ok = False
-        return jsonify({"message": "The server is up and running.", "db_connected": db_ok}), 200
+        return jsonify(
+            {"message": "The server is up and running.", "db_connected": db_ok}
+        ), 200
 
     # POST /api/create-user {email, login, password}
     # @app.post("/api/create-user")
@@ -120,7 +131,9 @@ def create_app():
         try:
             with get_engine().begin() as conn:
                 res = conn.execute(
-                    text("INSERT INTO Users (email, hpassword, login) VALUES (:email, :hpw, :login)"),
+                    text(
+                        "INSERT INTO Users (email, hpassword, login) VALUES (:email, :hpw, :login)"
+                    ),
                     {"email": email, "hpw": hpw, "login": login},
                 )
                 uid = int(res.lastrowid)
@@ -147,7 +160,9 @@ def create_app():
         try:
             with get_engine().connect() as conn:
                 row = conn.execute(
-                    text("SELECT id, email, login, hpassword FROM Users WHERE email = :email LIMIT 1"),
+                    text(
+                        "SELECT id, email, login, hpassword FROM Users WHERE email = :email LIMIT 1"
+                    ),
                     {"email": email},
                 ).first()
         except Exception as e:
@@ -156,8 +171,16 @@ def create_app():
         if not row or not check_password_hash(row.hpassword, password):
             return jsonify({"error": "invalid credentials"}), 401
 
-        token = _serializer().dumps({"uid": int(row.id), "login": row.login, "email": row.email})
-        return jsonify({"token": token, "token_type": "bearer", "expires_in": app.config["TOKEN_TTL_SECONDS"]}), 200
+        token = _serializer().dumps(
+            {"uid": int(row.id), "login": row.login, "email": row.email}
+        )
+        return jsonify(
+            {
+                "token": token,
+                "token_type": "bearer",
+                "expires_in": app.config["TOKEN_TTL_SECONDS"],
+            }
+        ), 200
 
     # POST /api/upload-document  (multipart/form-data)
     # @app.post("/api/upload-document")
@@ -186,10 +209,12 @@ def create_app():
         try:
             with get_engine().begin() as conn:
                 conn.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO Documents (name, path, ownerid, sha256, size)
                         VALUES (:name, :path, :ownerid, UNHEX(:sha256hex), :size)
-                    """),
+                    """
+                    ),
                     {
                         "name": final_name,
                         "path": str(stored_path),
@@ -200,23 +225,29 @@ def create_app():
                 )
                 did = int(conn.execute(text("SELECT LAST_INSERT_ID()")).scalar())
                 row = conn.execute(
-                    text("""
+                    text(
+                        """
                         SELECT id, name, creation, HEX(sha256) AS sha256_hex, size
                         FROM Documents
                         WHERE id = :id
-                    """),
+                    """
+                    ),
                     {"id": did},
                 ).one()
         except Exception as e:
             return jsonify({"error": f"database error: {str(e)}"}), 503
 
-        return jsonify({
-            "id": int(row.id),
-            "name": row.name,
-            "creation": row.creation.isoformat() if hasattr(row.creation, "isoformat") else str(row.creation),
-            "sha256": row.sha256_hex,
-            "size": int(row.size),
-        }), 201
+        return jsonify(
+            {
+                "id": int(row.id),
+                "name": row.name,
+                "creation": row.creation.isoformat()
+                if hasattr(row.creation, "isoformat")
+                else str(row.creation),
+                "sha256": row.sha256_hex,
+                "size": int(row.size),
+            }
+        ), 201
 
     # GET /api/list-documents
     # @app.get("/api/list-documents")
@@ -225,27 +256,32 @@ def create_app():
         try:
             with get_engine().connect() as conn:
                 rows = conn.execute(
-                    text("""
+                    text(
+                        """
                         SELECT id, name, creation, HEX(sha256) AS sha256_hex, size
                         FROM Documents
                         WHERE ownerid = :uid
                         ORDER BY creation DESC
-                    """),
+                    """
+                    ),
                     {"uid": int(g.user["id"])},
                 ).all()
         except Exception as e:
             return jsonify({"error": f"database error: {str(e)}"}), 503
 
-        docs = [{
-            "id": int(r.id),
-            "name": r.name,
-            "creation": r.creation.isoformat() if hasattr(r.creation, "isoformat") else str(r.creation),
-            "sha256": r.sha256_hex,
-            "size": int(r.size),
-        } for r in rows]
+        docs = [
+            {
+                "id": int(r.id),
+                "name": r.name,
+                "creation": r.creation.isoformat()
+                if hasattr(r.creation, "isoformat")
+                else str(r.creation),
+                "sha256": r.sha256_hex,
+                "size": int(r.size),
+            }
+            for r in rows
+        ]
         return jsonify({"documents": docs}), 200
-
-
 
     # GET /api/list-versions
     # @app.get("/api/list-versions")
@@ -259,33 +295,37 @@ def create_app():
                 document_id = int(document_id)
             except (TypeError, ValueError):
                 return jsonify({"error": "document id required"}), 400
-        
+
         try:
             with get_engine().connect() as conn:
                 rows = conn.execute(
-                    text("""
+                    text(
+                        """
                         SELECT v.id, v.documentid, v.link, v.intended_for, v.secret, v.method
                         FROM Users u
                         JOIN Documents d ON d.ownerid = u.id
                         JOIN Versions v ON d.id = v.documentid
                         WHERE u.login = :glogin AND d.id = :did
-                    """),
+                    """
+                    ),
                     {"glogin": str(g.user["login"]), "did": document_id},
                 ).all()
         except Exception as e:
             return jsonify({"error": f"database error: {str(e)}"}), 503
 
-        versions = [{
-            "id": int(r.id),
-            "documentid": int(r.documentid),
-            "link": r.link,
-            "intended_for": r.intended_for,
-            "secret": r.secret,
-            "method": r.method,
-        } for r in rows]
+        versions = [
+            {
+                "id": int(r.id),
+                "documentid": int(r.documentid),
+                "link": r.link,
+                "intended_for": r.intended_for,
+                "secret": r.secret,
+                "method": r.method,
+            }
+            for r in rows
+        ]
         return jsonify({"versions": versions}), 200
-    
-    
+
     # GET /api/list-all-versions
     # @app.get("/api/list-all-versions")
     @require_auth
@@ -293,33 +333,37 @@ def create_app():
         try:
             with get_engine().connect() as conn:
                 rows = conn.execute(
-                    text("""
+                    text(
+                        """
                         SELECT v.id, v.documentid, v.link, v.intended_for, v.method
                         FROM Users u
                         JOIN Documents d ON d.ownerid = u.id
                         JOIN Versions v ON d.id = v.documentid
                         WHERE u.login = :glogin
-                    """),
+                    """
+                    ),
                     {"glogin": str(g.user["login"])},
                 ).all()
         except Exception as e:
             return jsonify({"error": f"database error: {str(e)}"}), 503
 
-        versions = [{
-            "id": int(r.id),
-            "documentid": int(r.documentid),
-            "link": r.link,
-            "intended_for": r.intended_for,
-            "method": r.method,
-        } for r in rows]
+        versions = [
+            {
+                "id": int(r.id),
+                "documentid": int(r.documentid),
+                "link": r.link,
+                "intended_for": r.intended_for,
+                "method": r.method,
+            }
+            for r in rows
+        ]
         return jsonify({"versions": versions}), 200
-    
+
     # GET /api/get-document or /api/get-document/<id>  → returns the PDF (inline)
     # @app.get("/api/get-document")
     # @app.get("/api/get-document/<int:document_id>")
     @require_auth
     def get_document(document_id: int | None = None):
-    
         # Support both path param and ?id=/ ?documentid=
         if document_id is None:
             document_id = request.args.get("id") or request.args.get("documentid")
@@ -327,16 +371,18 @@ def create_app():
                 document_id = int(document_id)
             except (TypeError, ValueError):
                 return jsonify({"error": "document id required"}), 400
-        
+
         try:
             with get_engine().connect() as conn:
                 row = conn.execute(
-                    text("""
+                    text(
+                        """
                         SELECT id, name, path, HEX(sha256) AS sha256_hex, size
                         FROM Documents
                         WHERE id = :id AND ownerid = :uid
                         LIMIT 1
-                    """),
+                    """
+                    ),
                     {"id": document_id, "uid": int(g.user["id"])},
                 ).first()
         except Exception as e:
@@ -363,8 +409,10 @@ def create_app():
             file_path,
             mimetype="application/pdf",
             as_attachment=False,
-            download_name=row.name if row.name.lower().endswith(".pdf") else f"{row.name}.pdf",
-            conditional=True,   # enables 304 if If-Modified-Since/Range handling
+            download_name=row.name
+            if row.name.lower().endswith(".pdf")
+            else f"{row.name}.pdf",
+            conditional=True,  # enables 304 if If-Modified-Since/Range handling
             max_age=0,
             last_modified=file_path.stat().st_mtime,
         )
@@ -374,20 +422,21 @@ def create_app():
 
         resp.headers["Cache-Control"] = "private, max-age=0, must-revalidate"
         return resp
-    
+
     # GET /api/get-version/<link>  → returns the watermarked PDF (inline)
     # @app.get("/api/get-version/<link>")
     def get_version(link: str):
-        
         try:
             with get_engine().connect() as conn:
                 row = conn.execute(
-                    text("""
+                    text(
+                        """
                         SELECT *
                         FROM Versions
                         WHERE link = :link
                         LIMIT 1
-                    """),
+                    """
+                    ),
                     {"link": link},
                 ).first()
         except Exception as e:
@@ -414,15 +463,17 @@ def create_app():
             file_path,
             mimetype="application/pdf",
             as_attachment=False,
-            download_name=row.link if row.link.lower().endswith(".pdf") else f"{row.link}.pdf",
-            conditional=True,   # enables 304 if If-Modified-Since/Range handling
+            download_name=row.link
+            if row.link.lower().endswith(".pdf")
+            else f"{row.link}.pdf",
+            conditional=True,  # enables 304 if If-Modified-Since/Range handling
             max_age=0,
             last_modified=file_path.stat().st_mtime,
         )
 
         resp.headers["Cache-Control"] = "private, max-age=0"
         return resp
-    
+
     # Helper: resolve path safely under STORAGE_DIR (handles absolute/relative)
     def _safe_resolve_under_storage(p: str, storage_root: Path) -> Path:
         storage_root = storage_root.resolve()
@@ -482,7 +533,9 @@ def create_app():
                     file_deleted = True
                 except Exception as e:
                     delete_error = f"failed to delete file: {e}"
-                    app.logger.warning("Failed to delete file %s for doc id=%s: %s", fp, row.id, e)
+                    app.logger.warning(
+                        "Failed to delete file %s for doc id=%s: %s", fp, row.id, e
+                    )
             else:
                 file_missing = True
         except RuntimeError as e:
@@ -496,19 +549,22 @@ def create_app():
                 # If your schema does NOT have ON DELETE CASCADE on Version.documentid,
                 # uncomment the next line first:
                 # conn.execute(text("DELETE FROM Version WHERE documentid = :id"), {"id": doc_id})
-                conn.execute(text("DELETE FROM Documents WHERE id = :id"), {"id": doc_id})
+                conn.execute(
+                    text("DELETE FROM Documents WHERE id = :id"), {"id": doc_id}
+                )
         except Exception as e:
             return jsonify({"error": f"database error during delete: {str(e)}"}), 503
 
-        return jsonify({
-            "deleted": True,
-            "id": doc_id,
-            "file_deleted": file_deleted,
-            "file_missing": file_missing,
-            "note": delete_error,   # null/omitted if everything was fine
-        }), 200
-        
-        
+        return jsonify(
+            {
+                "deleted": True,
+                "id": doc_id,
+                "file_deleted": file_deleted,
+                "file_missing": file_missing,
+                "note": delete_error,  # null/omitted if everything was fine
+            }
+        ), 200
+
     # POST /api/create-watermark or /api/create-watermark/<id>  → create watermarked pdf and returns metadata
     # @app.post("/api/create-watermark")
     # @app.post("/api/create-watermark/<int:document_id>")
@@ -525,7 +581,7 @@ def create_app():
             doc_id = document_id
         except (TypeError, ValueError):
             return jsonify({"error": "document id required"}), 400
-            
+
         payload = request.get_json(silent=True) or {}
         # allow a couple of aliases for convenience
         method = payload.get("method")
@@ -539,19 +595,28 @@ def create_app():
             doc_id = int(doc_id)
         except (TypeError, ValueError):
             return jsonify({"error": "document_id (int) is required"}), 400
-        if not method or not intended_for or not isinstance(secret, str) or not isinstance(key, str):
-            return jsonify({"error": "method, intended_for, secret, and key are required"}), 400
+        if (
+            not method
+            or not intended_for
+            or not isinstance(secret, str)
+            or not isinstance(key, str)
+        ):
+            return jsonify(
+                {"error": "method, intended_for, secret, and key are required"}
+            ), 400
 
         # lookup the document; enforce ownership
         try:
             with get_engine().connect() as conn:
                 row = conn.execute(
-                    text("""
+                    text(
+                        """
                         SELECT id, name, path
                         FROM Documents
                         WHERE id = :id
                         LIMIT 1
-                    """),
+                    """
+                    ),
                     {"id": doc_id},
                 ).first()
         except Exception as e:
@@ -576,9 +641,7 @@ def create_app():
         # check watermark applicability
         try:
             applicable = WMUtils.is_watermarking_applicable(
-                method=method,
-                pdf=str(file_path),
-                position=position
+                method=method, pdf=str(file_path), position=position
             )
             if applicable is False:
                 return jsonify({"error": "watermarking method not applicable"}), 400
@@ -592,7 +655,7 @@ def create_app():
                 secret=secret,
                 key=key,
                 method=method,
-                position=position
+                position=position,
             )
             if not isinstance(wm_bytes, (bytes, bytearray)) or len(wm_bytes) == 0:
                 return jsonify({"error": "watermarking produced no output"}), 500
@@ -621,10 +684,12 @@ def create_app():
         try:
             with get_engine().begin() as conn:
                 conn.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO Versions (documentid, link, intended_for, secret, method, position, path)
                         VALUES (:documentid, :link, :intended_for, :secret, :method, :position, :path)
-                    """),
+                    """
+                    ),
                     {
                         "documentid": doc_id,
                         "link": link_token,
@@ -632,7 +697,7 @@ def create_app():
                         "secret": secret,
                         "method": method,
                         "position": position or "",
-                        "path": dest_path
+                        "path": dest_path,
                     },
                 )
                 vid = int(conn.execute(text("SELECT LAST_INSERT_ID()")).scalar())
@@ -644,18 +709,19 @@ def create_app():
                 pass
             return jsonify({"error": f"database error during version insert: {e}"}), 503
 
-        return jsonify({
-            "id": vid,
-            "documentid": doc_id,
-            "link": link_token,
-            "intended_for": intended_for,
-            "method": method,
-            "position": position,
-            "filename": candidate,
-            "size": len(wm_bytes),
-        }), 201
-        
-        
+        return jsonify(
+            {
+                "id": vid,
+                "documentid": doc_id,
+                "link": link_token,
+                "intended_for": intended_for,
+                "method": method,
+                "position": position,
+                "filename": candidate,
+                "size": len(wm_bytes),
+            }
+        ), 201
+
     # @app.post("/api/load-plugin")
     @require_auth
     def load_plugin():
@@ -699,7 +765,11 @@ def create_app():
         # Determine method name for registry
         method_name = getattr(cls, "name", getattr(cls, "__name__", None))
         if not method_name or not isinstance(method_name, str):
-            return jsonify({"error": "plugin class must define a readable name (class.__name__ or .name)"}), 400
+            return jsonify(
+                {
+                    "error": "plugin class must define a readable name (class.__name__ or .name)"
+                }
+            ), 400
 
         # Validate interface: either subclass of WatermarkingMethod or duck-typing
         has_api = all(hasattr(cls, attr) for attr in ("add_watermark", "read_secret"))
@@ -708,31 +778,37 @@ def create_app():
         else:
             is_ok = has_api
         if not is_ok:
-            return jsonify({"error": "plugin does not implement WatermarkingMethod API (add_watermark/read_secret)"}), 400
-            
+            return jsonify(
+                {
+                    "error": "plugin does not implement WatermarkingMethod API (add_watermark/read_secret)"
+                }
+            ), 400
+
         # Register the class (not an instance) so you can instantiate as needed later
         WMUtils.METHODS[method_name] = cls()
-        
-        return jsonify({
-            "loaded": True,
-            "filename": filename,
-            "registered_as": method_name,
-            "class_qualname": f"{getattr(cls, '__module__', '?')}.{getattr(cls, '__qualname__', cls.__name__)}",
-            "methods_count": len(WMUtils.METHODS)
-        }), 201
-        
-    
-    
+
+        return jsonify(
+            {
+                "loaded": True,
+                "filename": filename,
+                "registered_as": method_name,
+                "class_qualname": f"{getattr(cls, '__module__', '?')}.{getattr(cls, '__qualname__', cls.__name__)}",
+                "methods_count": len(WMUtils.METHODS),
+            }
+        ), 201
+
     # GET /api/get-watermarking-methods -> {"methods":[{"name":..., "description":...}, ...], "count":N}
     # @app.get("/api/get-watermarking-methods")
     def get_watermarking_methods():
         methods = []
 
         for m in WMUtils.METHODS:
-            methods.append({"name": m, "description": WMUtils.get_method(m).get_usage()})
-            
+            methods.append(
+                {"name": m, "description": WMUtils.get_method(m).get_usage()}
+            )
+
         return jsonify({"methods": methods, "count": len(methods)}), 200
-        
+
     # POST /api/read-watermark
     # @app.post("/api/read-watermark")
     # @app.post("/api/read-watermark/<int:document_id>")
@@ -749,7 +825,7 @@ def create_app():
             doc_id = document_id
         except (TypeError, ValueError):
             return jsonify({"error": "document id required"}), 400
-            
+
         payload = request.get_json(silent=True) or {}
         # allow a couple of aliases for convenience
         method = payload.get("method")
@@ -768,11 +844,13 @@ def create_app():
         try:
             with get_engine().connect() as conn:
                 row = conn.execute(
-                    text("""
+                    text(
+                        """
                         SELECT id, name, path
                         FROM Documents
                         WHERE id = :id
-                    """),
+                    """
+                    ),
                     {"id": doc_id},
                 ).first()
         except Exception as e:
@@ -793,25 +871,25 @@ def create_app():
             return jsonify({"error": "document path invalid"}), 500
         if not file_path.exists():
             return jsonify({"error": "file missing on disk"}), 410
-        
+
         secret = None
         try:
-            secret = WMUtils.read_watermark(
-                method=method,
-                pdf=str(file_path),
-                key=key
-            )
+            secret = WMUtils.read_watermark(method=method, pdf=str(file_path), key=key)
         except Exception as e:
-            return jsonify({"error": f"Error when attempting to read watermark: {e}"}), 400
-        return jsonify({
-            "documentid": doc_id,
-            "secret": secret,
-            "method": method,
-            "position": position
-        }), 201
+            return jsonify(
+                {"error": f"Error when attempting to read watermark: {e}"}
+            ), 400
+        return jsonify(
+            {
+                "documentid": doc_id,
+                "secret": secret,
+                "method": method,
+                "position": position,
+            }
+        ), 201
 
     return app
-    
+
 
 # WSGI entrypoint
 app = create_app()
@@ -819,4 +897,3 @@ app = create_app()
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-
