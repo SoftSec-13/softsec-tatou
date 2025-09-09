@@ -21,4 +21,3 @@ EXPOSE 5000
 
 # Default command runs the web server
 CMD ["gunicorn", "-b", "0.0.0.0:5000", "server:app"]
-
