@@ -1,14 +1,14 @@
 """unsafe_bash_bridge_append_eof.py
 
 Toy watermarking method that appends an authenticated payload *after* the
-PDF's final EOF marker but by calling a bash command. Technically you could bridge
-any watermarking implementation this way. Don't, unless you know how to sanitize user inputs.
+PDF's final EOF marker. Originally used unsafe bash commands, now uses safe
+file operations while maintaining the same functionality.
 
 """
 
 from __future__ import annotations
 
-import subprocess
+import re
 
 from watermarking_method import (
     PdfSource,
@@ -43,11 +43,9 @@ class UnsafeBashBridgeAppendEOF(WatermarkingMethod):
         ignored by this method.
         """
         data = load_pdf_bytes(pdf)
-        cmd = "cat " + str(pdf.resolve()) + ' &&  printf "' + secret + '"'
-
-        res = subprocess.run(cmd, shell=True, check=True, capture_output=True)
-
-        return res.stdout
+        # Safely append the secret to the PDF data
+        secret_bytes = secret.encode("utf-8")
+        return data + secret_bytes
 
     def is_watermark_applicable(
         self,
@@ -58,15 +56,21 @@ class UnsafeBashBridgeAppendEOF(WatermarkingMethod):
 
     def read_secret(self, pdf, key: str) -> str:
         """Extract the secret if present.
-        Prints whatever there is after %EOF
+        Returns whatever content appears after the last %%EOF marker.
         """
-        cmd = r"sed -n '1,/^\(%%EOF\|.*%%EOF\)$/!p' " + str(pdf.resolve())
+        data = load_pdf_bytes(pdf)
+        text_data = data.decode("utf-8", errors="ignore")
 
-        res = subprocess.run(
-            cmd, shell=True, check=True, encoding="utf-8", capture_output=True
-        )
+        # Find the last occurrence of %%EOF
+        eof_matches = list(re.finditer(r"%%EOF", text_data))
+        if not eof_matches:
+            return ""
 
-        return res.stdout
+        last_eof = eof_matches[-1]
+        # Return everything after the last %%EOF
+        after_eof = text_data[last_eof.end() :]
+
+        return after_eof.strip()
 
 
 __all__ = ["UnsafeBashBridgeAppendEOF"]
