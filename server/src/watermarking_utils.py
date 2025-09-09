@@ -49,12 +49,11 @@ METHODS: dict[str, WatermarkingMethod] = {
     AddAfterEOF.name: AddAfterEOF(),
     UnsafeBashBridgeAppendEOF.name: UnsafeBashBridgeAppendEOF(),
 }
-"""Registry of available watermarking methods.
-
-Keys are human-readable method names (stable, lowercase, hyphenated)
-exposed by each implementation's ``.name`` attribute. Values are
-*instances* of the corresponding class.
-"""
+#: Registry of available watermarking methods.
+#:
+#: Keys are human-readable method names (stable, lowercase, hyphenated)
+#: exposed by each implementation's ``.name`` attribute. Values are
+#: *instances* of the corresponding class.
 
 
 def register_method(method: WatermarkingMethod) -> None:
@@ -124,7 +123,7 @@ _TYPE_RE: Final[re.Pattern[bytes]] = re.compile(rb"/Type\s*/([A-Za-z]+)")
 
 
 def _sha1(b: bytes) -> str:
-    return hashlib.sha1(b).hexdigest()
+    return hashlib.sha1(b, usedforsecurity=False).hexdigest()
 
 
 def explore_pdf(pdf: PdfSource) -> dict[str, Any]:
@@ -199,7 +198,7 @@ def explore_pdf(pdf: PdfSource) -> dict[str, Any]:
         return root
     except Exception:
         # Fallback: regex-based object scanning (no third-party deps)
-        pass
+        ...
 
     # Regex fallback: enumerate uncompressed objects
     children: list[dict[str, Any]] = []

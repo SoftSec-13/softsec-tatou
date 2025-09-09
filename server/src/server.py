@@ -1,7 +1,6 @@
 import datetime as dt
 import hashlib
 import os
-import pickle as _std_pickle
 from functools import wraps
 from pathlib import Path
 
@@ -12,16 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
-try:
-    import dill as _pickle  # allows loading classes not importable by module path
-except Exception:  # dill is optional
-    _pickle = _std_pickle
-
-
 import watermarking_utils as WMUtils
-from watermarking_method import WatermarkingMethod
-
-# from watermarking_utils import METHODS, apply_watermark, read_watermark, explore_pdf, is_watermarking_applicable, get_method
 
 
 def create_app():
@@ -197,7 +187,7 @@ def create_app():
         user_dir = app.config["STORAGE_DIR"] / "files" / g.user["login"]
         user_dir.mkdir(parents=True, exist_ok=True)
 
-        ts = dt.datetime.utcnow().strftime("%Y%m%dT%H%M%S%fZ")
+        ts = dt.datetime.now(dt.UTC).strftime("%Y%m%dT%H%M%S%fZ")
         final_name = request.form.get("name") or fname
         stored_name = f"{ts}__{fname}"
         stored_path = user_dir / stored_name
@@ -683,8 +673,8 @@ def create_app():
         except Exception as e:
             return jsonify({"error": f"failed to write watermarked file: {e}"}), 500
 
-        # link token = sha1(watermarked_file_name)
-        link_token = hashlib.sha1(candidate.encode("utf-8")).hexdigest()
+        # link token = sha256(watermarked_file_name) - using stronger hash
+        link_token = hashlib.sha256(candidate.encode("utf-8")).hexdigest()
 
         try:
             with get_engine().begin() as conn:
@@ -710,8 +700,11 @@ def create_app():
             # best-effort cleanup if DB insert fails
             try:
                 dest_path.unlink(missing_ok=True)
-            except Exception:
-                pass
+            except Exception as cleanup_error:
+                # Log cleanup failure but don't mask the original error
+                app.logger.warning(
+                    f"Failed to cleanup file {dest_path}: {cleanup_error}"
+                )
             return jsonify({"error": f"database error during version insert: {e}"}), 503
 
         return jsonify(
@@ -731,76 +724,12 @@ def create_app():
     @require_auth
     def load_plugin():
         """
-        Load a serialized Python class implementing WatermarkingMethod from
-        STORAGE_DIR/files/plugins/<filename>.{pkl|dill} and register it in wm_mod.METHODS.
-        Body: { "filename": "MyMethod.pkl", "overwrite": false }
+        Plugin loading has been disabled for security reasons.
+        Pickle deserialization can execute arbitrary code and poses a security risk.
         """
-        payload = request.get_json(silent=True) or {}
-        filename = (payload.get("filename") or "").strip()
-        overwrite = bool(payload.get("overwrite", False))
-
-        if not filename:
-            return jsonify({"error": "filename is required"}), 400
-
-        # Locate the plugin in /storage/files/plugins (relative to STORAGE_DIR)
-        storage_root = Path(app.config["STORAGE_DIR"])
-        plugins_dir = storage_root / "files" / "plugins"
-        try:
-            plugins_dir.mkdir(parents=True, exist_ok=True)
-            plugin_path = plugins_dir / filename
-        except Exception as e:
-            return jsonify({"error": f"plugin path error: {e}"}), 500
-
-        if not plugin_path.exists():
-            return jsonify({"error": f"plugin file not found: {filename}"}), 404
-
-        # Unpickle the object (dill if available; else std pickle)
-        try:
-            with plugin_path.open("rb") as f:
-                obj = _pickle.load(f)
-        except Exception as e:
-            return jsonify({"error": f"failed to deserialize plugin: {e}"}), 400
-
-        # Accept: class object, or instance (we'll promote instance to its class)
-        if isinstance(obj, type):
-            cls = obj
-        else:
-            cls = obj.__class__
-
-        # Determine method name for registry
-        method_name = getattr(cls, "name", getattr(cls, "__name__", None))
-        if not method_name or not isinstance(method_name, str):
-            return jsonify(
-                {
-                    "error": "plugin class must define a readable name (class.__name__ or .name)"
-                }
-            ), 400
-
-        # Validate interface: either subclass of WatermarkingMethod or duck-typing
-        has_api = all(hasattr(cls, attr) for attr in ("add_watermark", "read_secret"))
-        if WatermarkingMethod is not None:
-            is_ok = issubclass(cls, WatermarkingMethod) and has_api
-        else:
-            is_ok = has_api
-        if not is_ok:
-            return jsonify(
-                {
-                    "error": "plugin does not implement WatermarkingMethod API (add_watermark/read_secret)"
-                }
-            ), 400
-
-        # Register the class (not an instance) so you can instantiate as needed later
-        WMUtils.METHODS[method_name] = cls()
-
         return jsonify(
-            {
-                "loaded": True,
-                "filename": filename,
-                "registered_as": method_name,
-                "class_qualname": f"{getattr(cls, '__module__', '?')}.{getattr(cls, '__qualname__', cls.__name__)}",
-                "methods_count": len(WMUtils.METHODS),
-            }
-        ), 201
+            {"error": "Plugin loading is disabled for security reasons"}
+        ), 501
 
     # GET /api/get-watermarking-methods -> {"methods":[{"name":..., "description":...}, ...], "count":N}
     # @app.get("/api/get-watermarking-methods")
@@ -903,4 +832,6 @@ app = create_app()
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    # Use localhost by default for security, allow override via environment variable
+    host = os.environ.get("HOST", "127.0.0.1")
+    app.run(host=host, port=port)

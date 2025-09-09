@@ -50,12 +50,11 @@ from typing import IO, ClassVar, TypeAlias
 # ----------------------------
 
 PdfSource: TypeAlias = bytes | str | os.PathLike[str] | IO[bytes]
-"""Accepted input type for a PDF document.
-
-Implementations should *not* assume the input is a file path; always call
-:func:`load_pdf_bytes` to normalize a :class:`PdfSource` into
-``bytes`` before processing.
-"""
+#: Accepted input type for a PDF document.
+#:
+#: Implementations should *not* assume the input is a file path; always call
+#: :func:`load_pdf_bytes` to normalize a :class:`PdfSource` into
+#: ``bytes`` before processing.
 
 
 class WatermarkingError(Exception):

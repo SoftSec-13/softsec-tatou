@@ -1,5 +1,4 @@
-# tests/test_watermarking_all_methods.py
-from __future__ import annotations
+# tests/test_watermarking_all_methods.pyfrom __future__ import annotations
 
 import importlib
 import inspect
@@ -63,7 +62,7 @@ class TestAllWatermarkingMethods:
     ):
         wm_impl = _as_instance(impl)
         ok = wm_impl.is_watermark_applicable(sample_pdf_path, position=None)
-        assert isinstance(ok, bool), (
+        assert isinstance(ok, bool), (  # nosec B101
             f"{method_name}: is_watermark_applicable must return bool"
         )
         if not ok:
@@ -84,13 +83,13 @@ class TestAllWatermarkingMethods:
         out_bytes = wm_impl.add_watermark(
             sample_pdf_path, secret=secret, key=key, position=None
         )
-        assert isinstance(out_bytes, (bytes, bytearray)), (
+        assert isinstance(out_bytes, (bytes, bytearray)), (  # nosec B101
             f"{method_name}: add_watermark must return bytes"
         )
-        assert len(out_bytes) >= len(original), (
+        assert len(out_bytes) >= len(original), (  # nosec B101
             f"{method_name}: watermarked bytes should not be smaller than input"
         )
-        assert out_bytes.startswith(b"%PDF-"), (
+        assert out_bytes.startswith(b"%PDF-"), (  # nosec B101
             f"{method_name}: output should still look like a PDF"
         )
 
@@ -113,7 +112,7 @@ class TestAllWatermarkingMethods:
             )
         )
         extracted = wm_impl.read_secret(out_pdf, key=key)
-        assert isinstance(extracted, str), f"{method_name}: read_secret must return str"
-        assert extracted == secret, (
+        assert isinstance(extracted, str), f"{method_name}: read_secret must return str"  # nosec B101
+        assert extracted == secret, (  # nosec B101
             f"{method_name}: read_secret should return the exact embedded secret"
         )
