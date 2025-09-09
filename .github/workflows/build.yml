@@ -2,7 +2,7 @@ name: Build and Push Docker Image
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main,  3-add-basic-tooling ]
   pull_request:
     branches: [ main ]
 
