@@ -7,6 +7,9 @@ from pathlib import Path
 
 import pytest
 
+# Import the proper type for watermarking methods
+from watermarking_method import WatermarkingMethod
+
 # --------- collect all methods from the registry ----------
 try:
     wm = importlib.import_module("watermarking_utils")
@@ -14,7 +17,7 @@ try:
 except Exception:  # registry/module missing
     METHODS = {}
 
-CASES: list[tuple[str, object]] = []
+CASES: list[tuple[str, WatermarkingMethod]] = []
 for name, impl in (METHODS or {}).items():
     if not name == "UnsafeBashBridgeAppendEOF":
         CASES.append((str(name), impl))
@@ -45,7 +48,7 @@ def key() -> str:
     return "unit-test-key"
 
 
-def _as_instance(impl: object) -> object:
+def _as_instance(impl: WatermarkingMethod) -> WatermarkingMethod:
     """Return an instance for class objects; pass instances through."""
     if inspect.isclass(impl):
         return impl()  # assumes zero-arg constructor
@@ -56,7 +59,7 @@ def _as_instance(impl: object) -> object:
 @pytest.mark.parametrize("method_name,impl", CASES, ids=[n for n, _ in CASES])
 class TestAllWatermarkingMethods:
     def test_is_watermark_applicable(
-        self, method_name: str, impl: object, sample_pdf_path: Path
+        self, method_name: str, impl: WatermarkingMethod, sample_pdf_path: Path
     ):
         wm_impl = _as_instance(impl)
         ok = wm_impl.is_watermark_applicable(sample_pdf_path, position=None)
@@ -69,7 +72,7 @@ class TestAllWatermarkingMethods:
     def test_add_watermark_and_shape(
         self,
         method_name: str,
-        impl: object,
+        impl: WatermarkingMethod,
         sample_pdf_path: Path,
         secret: str,
         key: str,
@@ -94,7 +97,7 @@ class TestAllWatermarkingMethods:
     def test_read_secret_roundtrip(
         self,
         method_name: str,
-        impl: object,
+        impl: WatermarkingMethod,
         sample_pdf_path: Path,
         secret: str,
         key: str,
