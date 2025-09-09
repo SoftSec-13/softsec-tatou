@@ -1,6 +1,7 @@
 import datetime as dt
 import hashlib
 import os
+import re
 from functools import wraps
 from pathlib import Path
 
@@ -86,11 +87,11 @@ def create_app():
 
     # --- Routes ---
 
-    # @app.route("/<path:filename>")
+    @app.route("/<path:filename>")
     def static_files(filename):
         return app.send_static_file(filename)
 
-    # @app.route("/")
+    @app.route("/")
     def home():
         return app.send_static_file("index.html")
 
@@ -105,9 +106,20 @@ def create_app():
         return jsonify(
             {"message": "The server is up and running.", "db_connected": db_ok}
         ), 200
+    
+    # Extra backend validation for user input
+    def validate_user_input(email: str, login: str) -> tuple[bool, str]:
+        """Validate user input before database operations"""
+        if len(email) > 320 or len(login) > 64:
+            return False, "Email or login too long"
+        if not re.match(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", email):
+            return False, "Invalid email format"
+        if not re.match(r"^[a-zA-Z0-9_-]{3,64}$", login):
+            return False, "Invalid login format"
+        return True, ""
 
     # POST /api/create-user {email, login, password}
-    # @app.post("/api/create-user")
+    @app.post("/api/create-user")
     def create_user():
         payload = request.get_json(silent=True) or {}
         email = (payload.get("email") or "").strip().lower()
@@ -119,6 +131,10 @@ def create_app():
         hpw = generate_password_hash(password)
 
         try:
+            is_valid, error_msg = validate_user_input(email, login)
+            if not is_valid:
+                return jsonify({"error": error_msg}), 400
+                        
             with get_engine().begin() as conn:
                 res = conn.execute(
                     text(
@@ -135,16 +151,18 @@ def create_app():
         except IntegrityError:
             return jsonify({"error": "email or login already exists"}), 409
         except Exception as e:
-            return jsonify({"error": f"database error: {str(e)}"}), 503
+            app.logger.error("Database error in create_user: %s", e)
+            return jsonify({"error": "database error"}), 503
 
         return jsonify({"id": row.id, "email": row.email, "login": row.login}), 201
 
     # POST /api/login {login, password}
-    # @app.post("/api/login")
+    @app.post("/api/login")
     def login():
         payload = request.get_json(silent=True) or {}
         email = (payload.get("email") or "").strip()
         password = payload.get("password") or ""
+        
         if not email or not password:
             return jsonify({"error": "email and password are required"}), 400
 
@@ -157,11 +175,22 @@ def create_app():
                     ),
                     {"email": email},
                 ).first()
-        except Exception as e:
-            return jsonify({"error": f"database error: {str(e)}"}), 503
+                
+                # Constant-time comparison to prevent timing attacks
+                if row:
+                    is_valid = check_password_hash(row.hpassword, password)
+                else:
+                    # Dummy check to maintain constant time
+                    is_valid = False
+                    row = None
+            
+                if not is_valid:
+                    app.logger.warning(f"Failed login attempt for email: {email}")
+                    return jsonify({"error": "invalid credentials"}), 401
 
-        if not row or not check_password_hash(row.hpassword, password):
-            return jsonify({"error": "invalid credentials"}), 401
+        except Exception as e:
+            app.logger.error(f"Database error in login: {str(e)}")
+            return jsonify({"error": "An error occurred"}), 503
 
         token = _serializer().dumps(
             {"uid": int(row.id), "login": row.login, "email": row.email}
