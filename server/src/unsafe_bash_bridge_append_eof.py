@@ -9,9 +9,9 @@ any watermarking implementation this way. Don't, unless you know how to sanitize
 from __future__ import annotations
 
 import subprocess
-from typing import Final
 
 from watermarking_method import (
+    PdfSource,
     WatermarkingMethod,
     load_pdf_bytes,
 )
@@ -20,7 +20,7 @@ from watermarking_method import (
 class UnsafeBashBridgeAppendEOF(WatermarkingMethod):
     """Toy method that appends a watermark record after the PDF EOF."""
 
-    name: Final[str] = "bash-bridge-eof"
+    name = "bash-bridge-eof"
 
     # ---------------------
     # Public API overrides

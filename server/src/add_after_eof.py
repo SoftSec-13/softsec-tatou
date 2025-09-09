@@ -30,6 +30,7 @@ from typing import Final
 
 from watermarking_method import (
     InvalidKeyError,
+    PdfSource,
     SecretNotFoundError,
     WatermarkingError,
     WatermarkingMethod,
@@ -55,7 +56,7 @@ class AddAfterEOF(WatermarkingMethod):
     using the caller-provided ``key`` (UTF‑8) and HMAC‑SHA256.
     """
 
-    name: Final[str] = "toy-eof"
+    name = "toy-eof"
 
     # Constants
     _MAGIC: Final[bytes] = b"\n%%WM-ADD-AFTER-EOF:v1\n"

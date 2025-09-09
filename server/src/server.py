@@ -510,9 +510,12 @@ def create_app():
 
         # Fetch the document (enforce ownership)
         try:
+            if doc_id is None:
+                return jsonify({"error": "document id required"}), 400
             with get_engine().connect() as conn:
-                query = "SELECT * FROM Documents WHERE id = " + doc_id
-                row = conn.execute(text(query)).first()
+                row = conn.execute(
+                    text("SELECT * FROM Documents WHERE id = :id"), {"id": doc_id}
+                ).first()
         except Exception as e:
             return jsonify({"error": f"database error: {str(e)}"}), 503
 
@@ -592,6 +595,8 @@ def create_app():
 
         # validate input
         try:
+            if doc_id is None:
+                return jsonify({"error": "document_id (int) is required"}), 400
             doc_id = int(doc_id)
         except (TypeError, ValueError):
             return jsonify({"error": "document_id (int) is required"}), 400
@@ -747,7 +752,7 @@ def create_app():
             return jsonify({"error": f"plugin path error: {e}"}), 500
 
         if not plugin_path.exists():
-            return jsonify({"error": f"plugin file not found: {safe}"}), 404
+            return jsonify({"error": f"plugin file not found: {filename}"}), 404
 
         # Unpickle the object (dill if available; else std pickle)
         try:
@@ -834,6 +839,8 @@ def create_app():
 
         # validate input
         try:
+            if doc_id is None:
+                return jsonify({"error": "document_id (int) is required"}), 400
             doc_id = int(doc_id)
         except (TypeError, ValueError):
             return jsonify({"error": "document_id (int) is required"}), 400
