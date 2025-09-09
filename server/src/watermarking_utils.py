@@ -26,38 +26,34 @@ To enable the richer exploration, install PyMuPDF:
     pip install pymupdf
 
 """
+
 from __future__ import annotations
 
-from typing import Any, Dict, Final, Iterable, List, Mapping
-import base64
 import hashlib
-import io
-import json
-import os
 import re
+from typing import Any, Final
 
+from add_after_eof import AddAfterEOF
+from unsafe_bash_bridge_append_eof import UnsafeBashBridgeAppendEOF
 from watermarking_method import (
     PdfSource,
     WatermarkingMethod,
     load_pdf_bytes,
 )
-from add_after_eof import AddAfterEOF
-from unsafe_bash_bridge_append_eof import UnsafeBashBridgeAppendEOF
 
 # --------------------
 # Method registry
 # --------------------
 
-METHODS: Dict[str, WatermarkingMethod] = {
+METHODS: dict[str, WatermarkingMethod] = {
     AddAfterEOF.name: AddAfterEOF(),
-    UnsafeBashBridgeAppendEOF.name: UnsafeBashBridgeAppendEOF()
+    UnsafeBashBridgeAppendEOF.name: UnsafeBashBridgeAppendEOF(),
 }
-"""Registry of available watermarking methods.
-
-Keys are human-readable method names (stable, lowercase, hyphenated)
-exposed by each implementation's ``.name`` attribute. Values are
-*instances* of the corresponding class.
-"""
+#: Registry of available watermarking methods.
+#:
+#: Keys are human-readable method names (stable, lowercase, hyphenated)
+#: exposed by each implementation's ``.name`` attribute. Values are
+#: *instances* of the corresponding class.
 
 
 def register_method(method: WatermarkingMethod) -> None:
@@ -87,6 +83,7 @@ def get_method(method: str | WatermarkingMethod) -> WatermarkingMethod:
 # Public API helpers
 # --------------------
 
+
 def apply_watermark(
     method: str | WatermarkingMethod,
     pdf: PdfSource,
@@ -98,12 +95,13 @@ def apply_watermark(
     m = get_method(method)
     return m.add_watermark(pdf=pdf, secret=secret, key=key, position=position)
 
+
 def is_watermarking_applicable(
     method: str | WatermarkingMethod,
     pdf: PdfSource,
     position: str | None = None,
-) -> bytes:
-    """Apply a watermark using the specified method and return new PDF bytes."""
+) -> bool:
+    """Check if watermarking is applicable using the specified method."""
     m = get_method(method)
     return m.is_watermark_applicable(pdf=pdf, position=position)
 
@@ -119,18 +117,16 @@ def read_watermark(method: str | WatermarkingMethod, pdf: PdfSource, key: str) -
 # --------------------
 
 # Pre-compiled regex for the fallback parser (very permissive):
-_OBJ_RE: Final[re.Pattern[bytes]] = re.compile(
-    rb"(?m)^(\d+)\s+(\d+)\s+obj\b"
-)
+_OBJ_RE: Final[re.Pattern[bytes]] = re.compile(rb"(?m)^(\d+)\s+(\d+)\s+obj\b")
 _ENDOBJ_RE: Final[re.Pattern[bytes]] = re.compile(rb"\bendobj\b")
 _TYPE_RE: Final[re.Pattern[bytes]] = re.compile(rb"/Type\s*/([A-Za-z]+)")
 
 
 def _sha1(b: bytes) -> str:
-    return hashlib.sha1(b).hexdigest()
+    return hashlib.sha1(b, usedforsecurity=False).hexdigest()
 
 
-def explore_pdf(pdf: PdfSource) -> Dict[str, Any]:
+def explore_pdf(pdf: PdfSource) -> dict[str, Any]:
     """Return a JSON-serializable *tree* describing the PDF's nodes.
 
     The structure is deterministic for a given set of input bytes. When
@@ -157,7 +153,7 @@ def explore_pdf(pdf: PdfSource) -> Dict[str, Any]:
     """
     data = load_pdf_bytes(pdf)
 
-    root: Dict[str, Any] = {
+    root: dict[str, Any] = {
         "id": f"pdf:{_sha1(data)}",
         "type": "Document",
         "size": len(data),
@@ -202,10 +198,10 @@ def explore_pdf(pdf: PdfSource) -> Dict[str, Any]:
         return root
     except Exception:
         # Fallback: regex-based object scanning (no third-party deps)
-        pass
+        ...
 
     # Regex fallback: enumerate uncompressed objects
-    children: List[Dict[str, Any]] = []
+    children: list[dict[str, Any]] = []
     for m in _OBJ_RE.finditer(data):
         obj_num = int(m.group(1))
         gen_num = int(m.group(2))
@@ -247,6 +243,5 @@ __all__ = [
     "apply_watermark",
     "read_watermark",
     "explore_pdf",
-    "is_watermarking_applicable"
+    "is_watermarking_applicable",
 ]
-
