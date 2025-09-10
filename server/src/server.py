@@ -106,7 +106,7 @@ def create_app():
         return jsonify(
             {"message": "The server is up and running.", "db_connected": db_ok}
         ), 200
-    
+
     # Extra backend validation for user input
     def validate_user_input(email: str, login: str) -> tuple[bool, str]:
         """Validate user input before database operations"""
@@ -134,7 +134,7 @@ def create_app():
             is_valid, error_msg = validate_user_input(email, login)
             if not is_valid:
                 return jsonify({"error": error_msg}), 400
-                        
+
             with get_engine().begin() as conn:
                 res = conn.execute(
                     text(
@@ -162,7 +162,7 @@ def create_app():
         payload = request.get_json(silent=True) or {}
         email = (payload.get("email") or "").strip()
         password = payload.get("password") or ""
-        
+
         if not email or not password:
             return jsonify({"error": "email and password are required"}), 400
 
@@ -175,7 +175,7 @@ def create_app():
                     ),
                     {"email": email},
                 ).first()
-                
+
                 # Constant-time comparison to prevent timing attacks
                 if row:
                     is_valid = check_password_hash(row.hpassword, password)
@@ -183,7 +183,7 @@ def create_app():
                     # Dummy check to maintain constant time
                     is_valid = False
                     row = None
-            
+
                 if not is_valid:
                     app.logger.warning(f"Failed login attempt for email: {email}")
                     return jsonify({"error": "invalid credentials"}), 401
