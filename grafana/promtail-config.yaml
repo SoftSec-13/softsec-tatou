@@ -1,0 +1,48 @@
+# server:
+#   http_listen_port: 9080
+#   grpc_listen_port: 0
+
+# positions:
+#   filename: /tmp/positions.yaml
+
+# clients:
+#   - url: http://loki:3100/loki/api/v1/push
+
+# scrape_configs:
+#   - job_name: docker
+#     docker_sd_configs:
+#       - host: unix:///var/run/docker.sock
+#     relabel_configs:
+#       - source_labels: [__meta_docker_container_name]
+#         target_label: container
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: flask-gunicorn
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+    relabel_configs:
+      - source_labels: [__meta_docker_container_name]
+        target_label: container
+
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<client_ip>\S+) \S+ \S+ \[(?P<time>[^\]]+)\] "(?P<method>\S+) (?P<path>\S+) \S+" (?P<status>\d+) (?P<size>\d+) "(?P<referrer>[^"]*)" "(?P<agent>[^"]*)" (?P<duration>[\d\.]+)'
+      - labels:
+          client_ip: ""
+          method: ""
+          path: ""
+          status: ""
+          size: ""
+          referrer: ""
+          agent: ""
+          duration: ""

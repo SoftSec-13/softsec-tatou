@@ -53,3 +53,9 @@ http -v :5000/healthz
 
 # Open your browser at 127.0.0.1:5000 to check if the website is up.
 ```
+
+### Monitor
+
+1. Open localhost:3000
+2. Login with admin:admin
+3. To view Dashboards, go to Home->Dashboards->Flask Gunicorn Logs & Metrics
