@@ -443,8 +443,8 @@ def create_app():
         return jsonify({"versions": versions}), 200
 
     # GET /api/get-document or /api/get-document/<id>  → returns the PDF (inline)
-    # @app.get("/api/get-document")
-    # @app.get("/api/get-document/<int:document_id>")
+    @app.get("/api/get-document")
+    @app.get("/api/get-document/<int:document_id>")
     @require_auth
     def get_document(document_id: int | None = None):
         # Support both path param and ?id=/ ?documentid=
@@ -469,42 +469,83 @@ def create_app():
                     {"id": document_id, "uid": int(g.user["id"])},
                 ).first()
         except Exception as e:
-            return jsonify({"error": f"database error: {str(e)}"}), 503
+            # Log error and return generic message
+            app.logger.error(f"Database error in get_document: {str(e)}")
+            # Return generic error message
+            return jsonify(
+                {"error": "An error occurred while fetching the document"}
+            ), 503
 
         # Don’t leak whether a doc exists for another user
         if not row:
             return jsonify({"error": "document not found"}), 404
 
+        storage_root = app.config["STORAGE_DIR"].resolve()
         file_path = Path(row.path)
 
         # Basic safety: ensure path is inside STORAGE_DIR and exists
         try:
-            file_path.resolve().relative_to(app.config["STORAGE_DIR"].resolve())
+            resolved = file_path.resolve()
+            resolved.relative_to(storage_root)
         except Exception:
             # Path looks suspicious or outside storage
             return jsonify({"error": "document path invalid"}), 500
 
-        if not file_path.exists():
+        if not resolved.exists():
             return jsonify({"error": "file missing on disk"}), 410
 
-        # Serve inline with caching hints + ETag based on stored sha256
-        resp = send_file(
-            file_path,
-            mimetype="application/pdf",
-            as_attachment=False,
-            download_name=row.name
-            if row.name.lower().endswith(".pdf")
-            else f"{row.name}.pdf",
-            conditional=True,  # enables 304 if If-Modified-Since/Range handling
-            max_age=0,
-            last_modified=file_path.stat().st_mtime,
-        )
-        # Strong validator
-        if isinstance(row.sha256_hex, str) and row.sha256_hex:
-            resp.set_etag(row.sha256_hex.lower())
+        # TOCTOU-safe open and validation
+        try:
+            f = open(resolved, "rb")
+        except OSError:
+            return jsonify({"error": "file missing on disk"}), 410
 
-        resp.headers["Cache-Control"] = "private, max-age=0, must-revalidate"
-        return resp
+        try:
+            # Quick PDF signature check
+            head = f.read(5)
+            if head != b"%PDF-":
+                f.close()
+                return jsonify({"error": "document not available"}), 415
+
+            f.seek(0)
+
+            # Prepare safe filename (preserve existing .pdf if present)
+            name = (row.name or "document").strip().replace("\r", "").replace("\n", "")
+            if not name.lower().endswith(".pdf"):
+                name = f"{name}.pdf"
+
+            # Stat via the same FD to avoid TOCTOU
+            st = os.fstat(f.fileno())
+
+            resp = send_file(
+                file_path,
+                mimetype="application/pdf",
+                as_attachment=False,
+                download_name=name,
+                conditional=False,  # enables 304 if If-Modified-Since/Range handling
+                max_age=0,
+                last_modified=st.st_mtime,
+            )
+
+            # Strong validator
+            if isinstance(row.sha256_hex, str) and row.sha256_hex:
+                resp.set_etag(row.sha256_hex.lower())
+
+            # Headers
+            resp.headers["Content-Type"] = "application/pdf"
+            resp.headers["Content-Disposition"] = f'inline; filename="{name}"'
+            resp.headers["Cache-Control"] = "private, max-age=0, must-revalidate"
+            resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+            resp.headers.setdefault(
+                "Content-Security-Policy", "sandbox; default-src 'none'"
+            )
+
+            return resp
+        except Exception as e:
+            f.close()
+            # Log error and return generic message
+            app.logger.error(f"Error serving file: {str(e)}")
+            return jsonify({"error": "error serving file"}), 500
 
     # GET /api/get-version/<link>  → returns the watermarked PDF (inline)
     # @app.get("/api/get-version/<link>")
