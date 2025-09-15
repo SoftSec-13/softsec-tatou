@@ -13,7 +13,6 @@ git clone https://github.com/nharrand/tatou.git
 
 Note that you should probably for the repo and clone your own repo.
 
-
 ### Run python unit tests
 
 ```bash
@@ -30,6 +29,14 @@ python -m pip install -e ".[dev]"
 
 # Run the unit tests
 python -m pytest
+```
+
+### Enable pre-commit
+```bash
+# Activate your virtual environement
+. .venv/bin/activate
+# Install pre-commit
+pre-commit install
 ```
 
 ### Deploy
