@@ -7,6 +7,8 @@ from pathlib import Path
 
 from flask import Flask, g, jsonify, request, send_file
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
+from rmap.identity_manager import IdentityManager
+from rmap.rmap import RMAP
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -31,7 +33,19 @@ def create_app():
     app.config["DB_PORT"] = int(os.environ.get("DB_PORT", "3306"))
     app.config["DB_NAME"] = os.environ.get("DB_NAME", "tatou")
 
+    # RMAP Config
+    app.config["RMAP_CLIENT_KEYS_DIR"] = Path(
+        os.environ.get("RMAP_CLIENT_KEYS_DIR", "./client_keys")
+    ).resolve()
+    app.config["RMAP_SERVER_PUBLIC_KEY"] = Path(
+        os.environ.get("RMAP_SERVER_PUBLIC_KEY", "./server_pub.asc")
+    ).resolve()
+    app.config["RMAP_SERVER_PRIVATE_KEY"] = Path(
+        os.environ.get("RMAP_SERVER_PRIVATE_KEY", "./server_priv.asc")
+    ).resolve()
+
     app.config["STORAGE_DIR"].mkdir(parents=True, exist_ok=True)
+    app.config["RMAP_CLIENT_KEYS_DIR"].mkdir(parents=True, exist_ok=True)
 
     # --- DB engine only (no Table metadata) ---
     def db_url() -> str:
@@ -84,6 +98,32 @@ def create_app():
             for chunk in iter(lambda: f.read(1024 * 1024), b""):
                 h.update(chunk)
         return h.hexdigest()
+
+    # --- RMAP Helpers ---
+    def _get_rmap_system():
+        """Initialize and return RMAP system with identity manager"""
+        try:
+            # Initialize identity manager with client keys directory
+            identity_manager = IdentityManager(str(app.config["RMAP_CLIENT_KEYS_DIR"]))
+
+            # Initialize RMAP with server keys
+            rmap = RMAP(
+                str(app.config["RMAP_SERVER_PUBLIC_KEY"]),
+                str(app.config["RMAP_SERVER_PRIVATE_KEY"]),
+                identity_manager,
+            )
+            return rmap
+        except Exception as e:
+            app.logger.error(f"Failed to initialize RMAP system: {e}")
+            raise
+
+    def _get_best_watermarking_method():
+        """Get the best watermarking method available"""
+        # Return the first available method as the "best" one
+        # You can modify this logic based on your preferred method
+        if WMUtils.METHODS:
+            return WMUtils.METHODS[0]
+        return None
 
     # --- Routes ---
 
@@ -863,6 +903,215 @@ def create_app():
                 "position": position,
             }
         ), 201
+
+    # --- RMAP Endpoints ---
+
+    # POST /rmap-initiate
+    @app.post("/rmap-initiate")
+    def rmap_initiate():
+        """
+        RMAP Message 1 handler: accepts encrypted payload with client nonce
+        and identity, validates the identity, and returns encrypted response
+        with both nonces.
+        """
+        try:
+            payload = request.get_json(silent=True) or {}
+            encrypted_payload = payload.get("payload")
+
+            if not encrypted_payload:
+                return jsonify({"error": "payload is required"}), 400
+
+            # Initialize RMAP system
+            try:
+                rmap = _get_rmap_system()
+            except Exception as e:
+                app.logger.error(f"Failed to initialize RMAP: {e}")
+                return jsonify({"error": "RMAP system initialization failed"}), 503
+
+            # Process Message 1 and generate Response 1
+            try:
+                response_payload = rmap.process_message_1(encrypted_payload)
+                return jsonify({"payload": response_payload}), 200
+            except Exception as e:
+                app.logger.warning(f"RMAP Message 1 processing failed: {e}")
+                return (
+                    jsonify({"error": "Invalid RMAP message or unknown identity"}),
+                    400,
+                )
+
+        except Exception as e:
+            app.logger.error(f"Unexpected error in rmap_initiate: {e}")
+            return jsonify({"error": "Internal server error"}), 500
+
+    # POST /rmap-get-link
+    @app.post("/rmap-get-link")
+    def rmap_get_link():
+        """
+        RMAP Message 2 handler: accepts encrypted payload with server nonce
+        confirmation, creates watermarked PDF using best technique, and
+        returns session secret as link.
+        """
+        try:
+            payload = request.get_json(silent=True) or {}
+            encrypted_payload = payload.get("payload")
+
+            if not encrypted_payload:
+                return jsonify({"error": "payload is required"}), 400
+
+            # Initialize RMAP system
+            try:
+                rmap = _get_rmap_system()
+            except Exception as e:
+                app.logger.error(f"Failed to initialize RMAP: {e}")
+                return jsonify({"error": "RMAP system initialization failed"}), 503
+
+            # Process Message 2 and get session secret
+            try:
+                session_secret = rmap.process_message_2(encrypted_payload)
+                if not session_secret:
+                    return (
+                        jsonify({"error": "Invalid RMAP message or session expired"}),
+                        400,
+                    )
+            except Exception as e:
+                app.logger.warning(f"RMAP Message 2 processing failed: {e}")
+                return (
+                    jsonify({"error": "Invalid RMAP message or session expired"}),
+                    400,
+                )
+
+            # Get the best watermarking method
+            best_method = _get_best_watermarking_method()
+            if not best_method:
+                return jsonify({"error": "No watermarking methods available"}), 503
+
+            # Find a sample PDF to watermark (use the first available document)
+            # In a real scenario, you might want to have a default PDF or let
+            # the client specify
+            try:
+                with get_engine().connect() as conn:
+                    # Get the first available PDF document
+                    row = conn.execute(
+                        text(
+                            """
+                            SELECT id, name, path
+                            FROM Documents
+                            ORDER BY creation DESC
+                            LIMIT 1
+                        """
+                        )
+                    ).first()
+            except Exception as e:
+                app.logger.error(f"Database error finding document: {e}")
+                return jsonify({"error": "Database error"}), 503
+
+            if not row:
+                return (
+                    jsonify({"error": "No documents available for watermarking"}),
+                    404,
+                )
+
+            # Get the identity from the RMAP session to use as intended_for
+            try:
+                identity = rmap.get_session_identity(session_secret)
+                if not identity:
+                    return (
+                        jsonify({"error": "Could not retrieve session identity"}),
+                        400,
+                    )
+            except Exception:
+                # Fallback to using session secret as identity
+                identity = "unknown_group"
+
+            # Resolve file path
+            storage_root = Path(app.config["STORAGE_DIR"]).resolve()
+            file_path = Path(row.path)
+            if not file_path.is_absolute():
+                file_path = storage_root / file_path
+            file_path = file_path.resolve()
+
+            try:
+                file_path.relative_to(storage_root)
+            except ValueError:
+                return jsonify({"error": "Invalid document path"}), 500
+
+            if not file_path.exists():
+                return jsonify({"error": "Document file not found"}), 410
+
+            # Apply watermark using best technique
+            try:
+                # Use session secret as both secret and key for watermarking
+                wm_bytes = WMUtils.apply_watermark(
+                    pdf=str(file_path),
+                    secret=session_secret[:32],  # Truncate to reasonable length
+                    key=session_secret[:32],
+                    method=best_method,
+                    position=None,
+                )
+
+                if not isinstance(wm_bytes, bytes) or len(wm_bytes) == 0:
+                    return jsonify({"error": "Watermarking produced no output"}), 500
+
+            except Exception as e:
+                app.logger.error(f"Watermarking failed: {e}")
+                return jsonify({"error": "Watermarking failed"}), 500
+
+            # Create watermarked file
+            base_name = Path(row.name or file_path.name).stem
+            intended_slug = secure_filename(identity)
+            dest_dir = file_path.parent / "rmap_watermarks"
+            dest_dir.mkdir(parents=True, exist_ok=True)
+
+            candidate = f"{base_name}__rmap__{intended_slug}.pdf"
+            dest_path = dest_dir / candidate
+
+            try:
+                with dest_path.open("wb") as f:
+                    f.write(wm_bytes)
+            except Exception as e:
+                return jsonify({"error": f"Failed to write watermarked file: {e}"}), 500
+
+            # Generate link from session secret (32-hex as specified)
+            link_hex = hashlib.sha256(session_secret.encode()).hexdigest()[:32]
+
+            # Store in database
+            try:
+                with get_engine().begin() as conn:
+                    conn.execute(
+                        text(
+                            """
+                            INSERT INTO Versions (documentid, link, intended_for,
+                                                secret, method, position, path)
+                            VALUES (:documentid, :link, :intended_for, :secret,
+                                   :method, :position, :path)
+                        """
+                        ),
+                        {
+                            "documentid": int(row.id),
+                            "link": link_hex,
+                            "intended_for": identity,
+                            "secret": session_secret[:32],
+                            "method": best_method,
+                            "position": "",
+                            "path": str(dest_path),
+                        },
+                    )
+            except Exception as e:
+                # Clean up file on DB error
+                try:
+                    dest_path.unlink(missing_ok=True)
+                except Exception as cleanup_error:
+                    app.logger.warning(
+                        f"Failed to cleanup file {dest_path}: {cleanup_error}"
+                    )
+                app.logger.error(f"Database error storing RMAP version: {e}")
+                return jsonify({"error": "Database error"}), 503
+
+            return jsonify({"result": link_hex}), 200
+
+        except Exception as e:
+            app.logger.error(f"Unexpected error in rmap_get_link: {e}")
+            return jsonify({"error": "Internal server error"}), 500
 
     return app
 
