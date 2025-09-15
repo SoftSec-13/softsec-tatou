@@ -337,35 +337,53 @@ def create_app():
         return jsonify({"documents": docs}), 200
 
     # GET /api/list-versions
-    # @app.get("/api/list-versions")
-    # @app.get("/api/list-versions/<int:document_id>")
+    @app.get("/api/list-versions")
+    @app.get("/api/list-versions/<int:document_id>")
     @require_auth
     def list_versions(document_id: int | None = None):
-        # Support both path param and ?id=/ ?documentid=
+        # Input validation
         if document_id is None:
             document_id = request.args.get("id") or request.args.get("documentid")
             try:
-                document_id = int(document_id)
+                document_id = int(document_id) if document_id else None
+                if document_id is None or document_id <= 0:
+                    return jsonify({"error": "document id required"}), 400
             except (TypeError, ValueError):
                 return jsonify({"error": "document id required"}), 400
 
         try:
             with get_engine().connect() as conn:
-                rows = conn.execute(
-                    text(
-                        """
-                        SELECT v.id, v.documentid, v.link, v.intended_for,
-                               v.secret, v.method
-                        FROM Users u
-                        JOIN Documents d ON d.ownerid = u.id
-                        JOIN Versions v ON d.id = v.documentid
-                        WHERE u.login = :glogin AND d.id = :did
-                    """
-                    ),
-                    {"glogin": str(g.user["login"]), "did": document_id},
-                ).all()
+                # First verify document ownership
+                doc = conn.execute(
+                    text("""
+                    SELECT id
+                    FROM Documents
+                    WHERE id = :did AND ownerid = :uid
+                    LIMIT 1
+                """),
+                    {"did": document_id, "uid": int(g.user["id"])},
+                ).first()
+
+            if not doc:
+                return jsonify({"error": "document not found"}), 404
+
+            # Then fetch versions with ownership validation
+            rows = conn.execute(
+                text("""
+                    SELECT v.id, v.documentid, v.link, v.intended_for,
+                           v.secret, v.method
+                    FROM Documents d
+                    JOIN Versions v ON d.id = v.documentid
+                    WHERE d.id = :did AND d.ownerid = :uid
+                    ORDER BY v.id DESC
+                """),
+                {"did": document_id, "uid": int(g.user["id"])},
+            ).all()
         except Exception as e:
-            return jsonify({"error": f"database error: {str(e)}"}), 503
+            # Log the full error for debugging
+            app.logger.error(f"Database error in list_versions: {str(e)}")
+            # Return generic error message
+            return jsonify({"error": "An error occurred while fetching versions"}), 503
 
         versions = [
             {
@@ -381,25 +399,36 @@ def create_app():
         return jsonify({"versions": versions}), 200
 
     # GET /api/list-all-versions
-    # @app.get("/api/list-all-versions")
+    @app.get("/api/list-all-versions")
     @require_auth
     def list_all_versions():
         try:
+            # Validate user data from auth token
+            if not g.user or not g.user.get("id"):
+                return jsonify({"error": "Invalid authentication"}), 401
+
             with get_engine().connect() as conn:
                 rows = conn.execute(
                     text(
                         """
                         SELECT v.id, v.documentid, v.link, v.intended_for, v.method
-                        FROM Users u
-                        JOIN Documents d ON d.ownerid = u.id
+                        FROM Documents d
                         JOIN Versions v ON d.id = v.documentid
-                        WHERE u.login = :glogin
+                        WHERE d.ownerid = :uid
+                        ORDER BY v.id DESC
+                        LIMIT 1000
                     """
                     ),
-                    {"glogin": str(g.user["login"])},
+                    {"uid": int(g.user["id"])},
                 ).all()
+        except ValueError:
+            app.logger.error("Invalid user ID in auth token")
+            return jsonify({"error": "Authentication error"}), 401
         except Exception as e:
-            return jsonify({"error": f"database error: {str(e)}"}), 503
+            # Log the full error for debugging
+            app.logger.error(f"Database error in list_all_versions: {str(e)}")
+            # Return generic error message
+            return jsonify({"error": "An error occurred while fetching versions"}), 503
 
         versions = [
             {
