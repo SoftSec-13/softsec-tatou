@@ -151,6 +151,7 @@ def create_app():
         except IntegrityError:
             return jsonify({"error": "email or login already exists"}), 409
         except Exception as e:
+            # Log error and return generic message
             app.logger.error("Database error in create_user: %s", e)
             return jsonify({"error": "database error"}), 503
 
@@ -189,6 +190,7 @@ def create_app():
                     return jsonify({"error": "invalid credentials"}), 401
 
         except Exception as e:
+            # Log error and return generic message
             app.logger.error(f"Database error in login: {str(e)}")
             return jsonify({"error": "An error occurred"}), 503
 
@@ -204,16 +206,31 @@ def create_app():
         ), 200
 
     # POST /api/upload-document  (multipart/form-data)
-    # @app.post("/api/upload-document")
+    @app.post("/api/upload-document")
     @require_auth
     def upload_document():
         if "file" not in request.files:
             return jsonify({"error": "file is required (multipart/form-data)"}), 400
+
         file = request.files["file"]
         if not file or file.filename == "":
             return jsonify({"error": "empty filename"}), 400
 
-        fname = file.filename
+        # Validate file size
+        MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
+        if file.content_length > MAX_FILE_SIZE:
+            return jsonify({"error": "file too large"}), 413
+
+        # Validate file type and MIME type
+        if file.mimetype != "application/pdf":
+            return jsonify({"error": "only PDF files are allowed"}), 415
+        if not file.filename.lower().endswith(".pdf"):
+            return jsonify({"error": "only PDF files are allowed"}), 415
+
+        # Sanitize filename
+        fname = secure_filename(file.filename)
+        if not fname:
+            return jsonify({"error": "invalid filename"}), 400
 
         user_dir = app.config["STORAGE_DIR"] / "files" / g.user["login"]
         user_dir.mkdir(parents=True, exist_ok=True)
@@ -221,8 +238,17 @@ def create_app():
         ts = dt.datetime.now(dt.UTC).strftime("%Y%m%dT%H%M%S%fZ")
         final_name = request.form.get("name") or fname
         stored_name = f"{ts}__{fname}"
-        stored_path = user_dir / stored_name
-        file.save(stored_path)
+
+        try:
+            # Check for path traversal attempts
+            stored_path = (user_dir / stored_name).resolve()
+            if not str(stored_path).startswith(str(user_dir.resolve())):
+                return jsonify({"error": "invalid path"}), 400
+
+            file.save(stored_path)
+        except Exception as e:
+            app.logger.error(f"File save error: {str(e)}")
+            return jsonify({"error": "failed to save file"}), 500
 
         sha_hex = _sha256_file(stored_path)
         size = stored_path.stat().st_size
@@ -249,14 +275,17 @@ def create_app():
                     text(
                         """
                         SELECT id, name, creation, HEX(sha256) AS sha256_hex, size
-                        FROM Documents
-                        WHERE id = :id
+                        FROM Documents WHERE id = :id
                     """
                     ),
                     {"id": did},
                 ).one()
         except Exception as e:
-            return jsonify({"error": f"database error: {str(e)}"}), 503
+            # Remove file if DB insert fails
+            stored_path.unlink(missing_ok=True)
+            # Log error and return generic message
+            app.logger.error(f"Database error: {str(e)}")
+            return jsonify({"error": "database error occurred"}), 503
 
         return jsonify(
             {
@@ -271,7 +300,7 @@ def create_app():
         ), 201
 
     # GET /api/list-documents
-    # @app.get("/api/list-documents")
+    @app.get("/api/list-documents")
     @require_auth
     def list_documents():
         try:
@@ -288,7 +317,10 @@ def create_app():
                     {"uid": int(g.user["id"])},
                 ).all()
         except Exception as e:
-            return jsonify({"error": f"database error: {str(e)}"}), 503
+            # Log the full error for debugging
+            app.logger.error(f"Database error in list_documents: {str(e)}")
+            # Return generic error message
+            return jsonify({"error": "An error occurred while fetching documents"}), 503
 
         docs = [
             {
