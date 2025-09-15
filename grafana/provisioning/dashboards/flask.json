@@ -1,0 +1,22 @@
+{
+  "uid": "flask-dashboard",
+  "title": "Flask Gunicorn Logs & Metrics",
+  "tags": ["flask", "gunicorn", "logs"],
+  "timezone": "browser",
+  "schemaVersion": 37,
+  "version": 1,
+  "refresh": "10s",
+  "panels": [
+    {
+      "type": "logs",
+      "title": "Raw Gunicorn Logs",
+      "targets": [
+        {
+          "expr": "{container=\"/softsec-tatou-server-1\", method=~\"GET|POST\"}",
+          "datasource": {"type": "loki", "uid": "loki"}
+        }
+      ],
+      "gridPos": {"x": 0, "y": 0, "w": 24, "h": 8}
+    }
+  ]
+}

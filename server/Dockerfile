@@ -20,4 +20,4 @@ RUN pip install --no-cache-dir -e .
 EXPOSE 5000
 
 # Default command runs the web server
-CMD ["gunicorn", "-b", "0.0.0.0:5000", "server:app"]
+CMD ["gunicorn", "-b", "0.0.0.0:5000", "server:app", "--access-logfile=-", "--error-logfile=-", "--access-logformat", "%(h)s %(l)s %(u)s %(t)s \"%(r)s\" %(s)s %(b)s \"%(f)s\" \"%(a)s\" %(L)s"]
