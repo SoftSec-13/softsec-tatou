@@ -26,6 +26,8 @@
 - [read-watermark](#read-watermark)
   - **POST** `/api/read-watermark/<int:document_id>`
   - **POST** `/api/read-watermark`
+- [rmap-initiate](#rmap-initiate) — **POST** `/rmap-initiate`
+- [rmap-get-link](#rmap-get-link) — **POST** `/rmap-get-link`
 - [upload-document](#upload-document) — **POST** `/api/upload-document`
 
 
@@ -398,4 +400,113 @@ This endpoint reads information contain in a pdf document's watermark with the p
 ```
 
 **Specification**
- * Only the owner of a document should
+ * Only the owner of a document should be able to create watermarks for their documents.
+
+---
+
+## RMAP Routes
+
+The following routes implement the RMAP (Roger Michael Authentication Protocol) for client authentication.
+
+### rmap-initiate
+
+**Path**
+`POST /rmap-initiate`
+
+**Description**
+Handles RMAP Message 1 for client authentication initiation. The client sends their nonce and identity encrypted to the server's public key.
+
+**Parameters**
+```json
+{
+    "payload": "<base64-encoded-pgp-message>"
+}
+```
+
+The decrypted message should contain:
+```json
+{
+    "nonceClient": <64-bit-unsigned-integer>,
+    "identity": "<string>"
+}
+```
+
+**Return**
+On success:
+```json
+{
+    "payload": "<base64-encoded-pgp-response>"
+}
+```
+
+The response payload when decrypted contains:
+```json
+{
+    "nonceClient": <64-bit-unsigned-integer>,
+    "nonceServer": <64-bit-unsigned-integer>
+}
+```
+
+On error:
+```json
+{
+    "error": "<error-message>"
+}
+```
+
+**Status Codes**
+- `200`: Success
+- `400`: Invalid payload or unknown identity
+- `503`: RMAP system initialization failed
+
+---
+
+### rmap-get-link
+
+**Path**
+`POST /rmap-get-link`
+
+**Description**
+Handles RMAP Message 2 for final authentication step. The client proves they have the server nonce by sending it back encrypted.
+
+**Parameters**
+```json
+{
+    "payload": "<base64-encoded-pgp-message>"
+}
+```
+
+The decrypted message should contain:
+```json
+{
+    "nonceServer": <64-bit-unsigned-integer>
+}
+```
+
+**Return**
+On success:
+```json
+{
+    "result": "<32-hex-character-string>"
+}
+```
+
+The result is a 128-bit value represented as 32 hexadecimal characters, computed as: `(nonceClient << 64) | nonceServer`.
+
+On error:
+```json
+{
+    "error": "<error-message>"
+}
+```
+
+**Status Codes**
+- `200`: Success  
+- `400`: Invalid payload or nonce not found
+- `503`: RMAP system initialization failed
+
+**Specification**
+- The RMAP protocol requires a two-message handshake
+- All payloads are base64-encoded ASCII-armored PGP messages
+- Nonces must be 64-bit unsigned integers (0 to 2^64-1)
+- The final result concatenates nonces as: NonceClient || NonceServer (big-endian)
