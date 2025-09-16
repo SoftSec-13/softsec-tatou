@@ -49,6 +49,7 @@ from watermarking_method import (
 # Try to import PyMuPDF for advanced PDF manipulation
 try:
     import fitz  # PyMuPDF
+
     HAS_PYMUPDF = True
 except ImportError:
     HAS_PYMUPDF = False
@@ -77,10 +78,10 @@ class RobustXmpWatermark(WatermarkingMethod):
     _XMP_NAMESPACE: Final[str] = "http://tatou.security/watermark/"
     _XMP_PREFIX: Final[str] = "tw"
     _FRAGMENT_COUNT: Final[int] = 3  # Number of fragments to distribute
-    _MIN_FRAGMENTS: Final[int] = 2   # Minimum fragments needed for reconstruction
-    _SALT_SIZE: Final[int] = 16      # Salt size for key derivation
+    _MIN_FRAGMENTS: Final[int] = 2  # Minimum fragments needed for reconstruction
+    _SALT_SIZE: Final[int] = 16  # Salt size for key derivation
     _KEY_ITERATIONS: Final[int] = 100000  # PBKDF2 iterations
-    _VERSION: Final[int] = 1         # Watermark format version
+    _VERSION: Final[int] = 1  # Watermark format version
 
     @staticmethod
     def get_usage() -> str:
@@ -132,7 +133,7 @@ class RobustXmpWatermark(WatermarkingMethod):
             "id": watermark_id,
             "timestamp": timestamp,
             "secret": secret,
-            "salt": base64.b64encode(salt).decode('ascii'),
+            "salt": base64.b64encode(salt).decode("ascii"),
         }
 
         # Encrypt the payload
@@ -255,22 +256,22 @@ class RobustXmpWatermark(WatermarkingMethod):
             salt=salt,
             iterations=self._KEY_ITERATIONS,
         )
-        return kdf.derive(password.encode('utf-8'))
+        return kdf.derive(password.encode("utf-8"))
 
     def _encrypt_payload(self, payload: dict[str, Any], key: bytes) -> str:
         """Encrypt payload using AES-GCM and include salt."""
         aesgcm = AESGCM(key)
         nonce = secrets.token_bytes(12)  # 96-bit nonce for GCM
 
-        payload_json = json.dumps(payload, separators=(',', ':')).encode('utf-8')
+        payload_json = json.dumps(payload, separators=(",", ":")).encode("utf-8")
         ciphertext = aesgcm.encrypt(nonce, payload_json, None)
 
         # Include salt from payload in the encrypted data for easier extraction
-        salt = base64.b64decode(payload['salt'])
+        salt = base64.b64decode(payload["salt"])
 
         # Combine salt, nonce, and ciphertext
         encrypted = salt + nonce + ciphertext
-        return base64.b64encode(encrypted).decode('ascii')
+        return base64.b64encode(encrypted).decode("ascii")
 
     def _decrypt_payload(self, encrypted_b64: str, key: bytes) -> dict[str, Any]:
         """Decrypt payload using AES-GCM (legacy method)."""
@@ -287,11 +288,13 @@ class RobustXmpWatermark(WatermarkingMethod):
         metadata = doc.metadata
 
         # Use a combination of standard and custom fields
-        metadata.update({
-            "subject": f"tw-{watermark_id[:8]}-{encrypted_payload[:100]}",
-            "keywords": f"watermark,{watermark_id}",
-            "producer": f"Tatou Security Watermarker v{self._VERSION}",
-        })
+        metadata.update(
+            {
+                "subject": f"tw-{watermark_id[:8]}-{encrypted_payload[:100]}",
+                "keywords": f"watermark,{watermark_id}",
+                "producer": f"Tatou Security Watermarker v{self._VERSION}",
+            }
+        )
         doc.set_metadata(metadata)
 
     def _embed_in_document_info(
@@ -300,10 +303,12 @@ class RobustXmpWatermark(WatermarkingMethod):
         """Embed watermark backup in document info dictionary."""
         # Use document info fields for additional storage
         metadata = doc.metadata
-        metadata.update({
-            "creator": f"Tatou-{watermark_id[:8]}",  # Partial ID in creator
-            "title": encrypted_payload,  # Full payload in title (main storage)
-        })
+        metadata.update(
+            {
+                "creator": f"Tatou-{watermark_id[:8]}",  # Partial ID in creator
+                "title": encrypted_payload,  # Full payload in title (main storage)
+            }
+        )
         doc.set_metadata(metadata)
 
     def _embed_fragments(
@@ -315,7 +320,7 @@ class RobustXmpWatermark(WatermarkingMethod):
     ) -> None:
         """Distribute watermark fragments across PDF objects."""
         # Split payload into fragments
-        payload_bytes = encrypted_payload.encode('utf-8')
+        payload_bytes = encrypted_payload.encode("utf-8")
         fragment_size = len(payload_bytes) // self._FRAGMENT_COUNT + 1
         fragments = []
 
@@ -326,18 +331,18 @@ class RobustXmpWatermark(WatermarkingMethod):
             fragments.append(fragment)
 
         # Add fragments to PDF as annotations or form fields
-        for i, fragment in enumerate(fragments):
+        for _i, fragment in enumerate(fragments):
             try:
                 if doc.page_count > 0:
                     page = doc.load_page(0)  # Use first page
 
                     # Create invisible annotation with fragment data
-                    fragment_b64 = base64.b64encode(fragment).decode('ascii')
+                    fragment_b64 = base64.b64encode(fragment).decode("ascii")
 
                     # Add as form field or annotation
                     page.add_text_annot([0, 0], fragment_b64)
 
-            except Exception:
+            except Exception:  # nosec B112  # noqa: S112
                 # If we can't add annotations, skip fragments
                 continue
 
@@ -352,7 +357,7 @@ class RobustXmpWatermark(WatermarkingMethod):
             producer = metadata.get("producer", "")
 
             # Check if this looks like our watermark format
-            if ("watermark" in keywords and "Tatou Security" in producer):
+            if "watermark" in keywords and "Tatou Security" in producer:
                 # Try subject first (partial payload with watermark ID)
                 if "tw-" in subject:
                     parts = subject.split("-", 2)  # tw-<id>-<payload>
@@ -362,7 +367,7 @@ class RobustXmpWatermark(WatermarkingMethod):
                 # Fallback to title (full payload)
                 if title:
                     return title
-        except Exception:
+        except Exception:  # nosec B110  # noqa: S110
             pass
         return None
 
@@ -377,7 +382,7 @@ class RobustXmpWatermark(WatermarkingMethod):
             if creator.startswith("Tatou-") and title:
                 # The full payload is stored in title
                 return title
-        except Exception:
+        except Exception:  # nosec B110  # noqa: S110
             pass
         return None
 
@@ -405,7 +410,7 @@ class RobustXmpWatermark(WatermarkingMethod):
                                     fragments[fragment_idx] = base64.b64decode(content)
                                 except (ValueError, TypeError):
                                     continue
-                    except Exception:
+                    except Exception:  # nosec B112  # noqa: S112
                         continue
 
             # Reconstruct payload from fragments
@@ -413,9 +418,9 @@ class RobustXmpWatermark(WatermarkingMethod):
                 reconstructed = b""
                 for i in sorted(fragments.keys()):
                     reconstructed += fragments[i]
-                return reconstructed.decode('utf-8')
+                return reconstructed.decode("utf-8")
 
-        except Exception:
+        except Exception:  # nosec B110  # noqa: S110
             pass
         return None
 
@@ -427,9 +432,9 @@ class RobustXmpWatermark(WatermarkingMethod):
 
             if len(encrypted_data) >= self._SALT_SIZE + 12:
                 # Extract salt from beginning of encrypted data
-                salt = encrypted_data[:self._SALT_SIZE]
-                nonce = encrypted_data[self._SALT_SIZE:self._SALT_SIZE + 12]
-                ciphertext = encrypted_data[self._SALT_SIZE + 12:]
+                salt = encrypted_data[: self._SALT_SIZE]
+                nonce = encrypted_data[self._SALT_SIZE : self._SALT_SIZE + 12]
+                ciphertext = encrypted_data[self._SALT_SIZE + 12 :]
 
                 # Derive key using extracted salt
                 derived_key = self._derive_key(key, salt)
@@ -437,11 +442,13 @@ class RobustXmpWatermark(WatermarkingMethod):
                 # Decrypt
                 aesgcm = AESGCM(derived_key)
                 payload_json = aesgcm.decrypt(nonce, ciphertext, None)
-                payload = json.loads(payload_json.decode('utf-8'))
+                payload = json.loads(payload_json.decode("utf-8"))
 
                 # Validate payload structure
-                if (isinstance(payload, dict) and
-                    payload.get("version") == self._VERSION):
+                if (
+                    isinstance(payload, dict)
+                    and payload.get("version") == self._VERSION
+                ):
                     return payload["secret"]
 
             # If the above doesn't work, raise an error
