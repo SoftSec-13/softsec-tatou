@@ -1,0 +1,28 @@
+# Server keys - do not commit private keys
+server_priv.asc
+*_priv.asc
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Storage directories
+storage/
+*.egg-info/
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test coverage
+.coverage
+htmlcov/
+
+# Temporary files
+*.tmp
+*.temp

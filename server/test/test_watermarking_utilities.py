@@ -20,7 +20,14 @@ class TestWatermarkingUtils:
     @pytest.fixture
     def sample_pdf_bytes(self):
         """Create minimal valid PDF for testing."""
-        return b"%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>\nendobj\nxref\n0 4\n0000000000 65535 f \n0000000010 00000 n \n0000000060 00000 n \n0000000120 00000 n \ntrailer\n<< /Size 4 /Root 1 0 R >>\nstartxref\n180\n%%EOF\n"
+        return (
+            b"%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
+            b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n"
+            b"3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>\n"
+            b"endobj\nxref\n0 4\n0000000000 65535 f \n0000000010 00000 n \n"
+            b"0000000060 00000 n \n0000000120 00000 n \ntrailer\n"
+            b"<< /Size 4 /Root 1 0 R >>\nstartxref\n180\n%%EOF\n"
+        )
 
     @pytest.fixture
     def sample_pdf_path(self, sample_pdf_bytes):
@@ -43,9 +50,9 @@ class TestWatermarkingUtils:
         # Verify all registered methods are WatermarkingMethod instances
         for _name, method in WMUtils.METHODS.items():
             assert isinstance(method, WatermarkingMethod)
-            assert hasattr(method, 'add_watermark')
-            assert hasattr(method, 'read_secret')
-            assert hasattr(method, 'is_watermark_applicable')
+            assert hasattr(method, "add_watermark")
+            assert hasattr(method, "read_secret")
+            assert hasattr(method, "is_watermark_applicable")
 
     def test_get_method_with_string(self):
         """Test get_method with string method names."""
@@ -118,11 +125,11 @@ class TestWatermarkingUtils:
             result = WMUtils.apply_watermark(
                 method=method_name,
                 pdf=sample_pdf_path,
-                secret="test-secret",
-                key="test-key"
+                secret="test-secret",  # pragma: allowlist secret
+                key="test-key",
             )
 
-            assert isinstance(result, (bytes, bytearray))
+            assert isinstance(result, bytes | bytearray)
             assert len(result) > 0
 
     def test_apply_watermark_with_method_instance(self, sample_pdf_path):
@@ -134,11 +141,11 @@ class TestWatermarkingUtils:
             result = WMUtils.apply_watermark(
                 method=method,
                 pdf=sample_pdf_path,
-                secret="test-secret",
-                key="test-key"
+                secret="test-secret",  # pragma: allowlist secret
+                key="test-key",  # pragma: allowlist secret
             )
 
-            assert isinstance(result, (bytes, bytearray))
+            assert isinstance(result, bytes | bytearray)
             assert len(result) > 0
 
     def test_read_watermark_requires_watermarked_pdf(self, sample_pdf_path):
@@ -177,9 +184,10 @@ class TestWatermarkingUtils:
     def test_explore_pdf_with_fitz_available(self, sample_pdf_bytes):
         """Test explore_pdf when PyMuPDF (fitz) is available."""
         # Mock the import inside the function
-        with patch.dict('sys.modules', {'fitz': Mock()}):
+        with patch.dict("sys.modules", {"fitz": Mock()}):
             import sys
-            mock_fitz = sys.modules['fitz']
+
+            mock_fitz = sys.modules["fitz"]
 
             # Mock fitz document
             mock_doc = Mock()
@@ -199,11 +207,12 @@ class TestWatermarkingUtils:
 
     def test_explore_pdf_fallback_without_fitz(self, sample_pdf_bytes):
         """Test explore_pdf fallback when fitz is not available."""
-        # Since fitz is actually available in our environment, we need to test the fallback differently
-        # We'll test that the function works even if fitz import fails internally
+        # Since fitz is actually available in our environment, we need to test
+        # the fallback differently. We'll test that the function works even if
+        # fitz import fails internally
 
         # Force the fallback by causing fitz.open to raise an exception
-        with patch('fitz.open', side_effect=Exception("Forced fallback")):
+        with patch("fitz.open", side_effect=Exception("Forced fallback")):
             result = WMUtils.explore_pdf(sample_pdf_bytes)
 
             # Should still work with regex fallback
@@ -235,7 +244,7 @@ class TestWatermarkingUtils:
         """Test that all registered methods have required attributes."""
         for name, method in WMUtils.METHODS.items():
             # Should have name attribute matching registry key
-            assert hasattr(method, 'name')
+            assert hasattr(method, "name")
             assert method.name == name
 
             # Should have required methods

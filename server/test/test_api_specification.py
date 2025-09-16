@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from server import create_app
+from src.server import create_app
 
 
 class TestAPISpecificationCompliance:
@@ -20,12 +20,14 @@ class TestAPISpecificationCompliance:
     def app(self):
         """Create Flask app for testing."""
         app = create_app()
-        app.config.update({
-            "TESTING": True,
-            "SECRET_KEY": "test-secret-key",
-            "TOKEN_TTL_SECONDS": 3600,
-            "STORAGE_DIR": Path(tempfile.mkdtemp()),
-        })
+        app.config.update(
+            {
+                "TESTING": True,
+                "SECRET_KEY": "test-secret-key",  # pragma: allowlist secret
+                "TOKEN_TTL_SECONDS": 3600,
+                "STORAGE_DIR": Path(tempfile.mkdtemp()),
+            }
+        )
         return app
 
     @pytest.fixture
@@ -53,9 +55,9 @@ class TestAPISpecificationCompliance:
         # Response structure compliance
         data = resp.get_json()
         assert "message" in data, "API spec requires 'message' field"
-        assert isinstance(
-            data["message"], str
-        ), "API spec requires message to be string"
+        assert isinstance(data["message"], str), (
+            "API spec requires message to be string"
+        )
         assert len(data["message"]) > 0, "Message should not be empty"
 
     def test_healthz_no_authentication_required(self, client):
@@ -79,8 +81,8 @@ class TestAPISpecificationCompliance:
         # Test without mocking - will fail DB connection but we can test validation
         user_data = {
             "login": "testuser",
-            "password": "securepass123",
-            "email": "test@example.com"
+            "password": "securepass123",  # pragma: allowlist secret
+            "email": "test@example.com",
         }
 
         resp = client.post("/api/create-user", json=user_data)
@@ -94,24 +96,26 @@ class TestAPISpecificationCompliance:
     def test_create_user_validation_requirements(self, client):
         """Test create-user validates required fields per specification."""
         # Missing email
-        resp = client.post("/api/create-user", json={
-            "login": "testuser",
-            "password": "password123"
-        })
+        resp = client.post(
+            "/api/create-user",
+            json={
+                "login": "testuser",
+                "password": "password123",
+            },  # pragma: allowlist secret
+        )
         assert resp.status_code == 400
 
         # Missing login
-        resp = client.post("/api/create-user", json={
-            "email": "test@example.com",
-            "password": "password123"
-        })
+        resp = client.post(
+            "/api/create-user",
+            json={"email": "test@example.com", "password": "password123"},
+        )
         assert resp.status_code == 400
 
         # Missing password
-        resp = client.post("/api/create-user", json={
-            "email": "test@example.com",
-            "login": "testuser"
-        })
+        resp = client.post(
+            "/api/create-user", json={"email": "test@example.com", "login": "testuser"}
+        )
         assert resp.status_code == 400
 
     # ===== LOGIN ENDPOINT TESTS =====
@@ -125,7 +129,7 @@ class TestAPISpecificationCompliance:
         # Test with missing credentials to verify endpoint exists and validates
         login_data = {
             "email": "test@example.com",
-            "password": "correctpass"
+            "password": "correctpass",  # pragma: allowlist secret
         }
 
         resp = client.post("/api/login", json=login_data)
@@ -230,7 +234,14 @@ class TestAPISpecificationCompliance:
             ("/api/create-user", "POST", {}),
             ("/api/login", "POST", {}),
             ("/api/create-user", "POST", {"email": "invalid"}),
-            ("/api/login", "POST", {"email": "nonexistent@example.com", "password": "wrong"}),
+            (
+                "/api/login",
+                "POST",
+                {
+                    "email": "nonexistent@example.com",
+                    "password": "wrong",
+                },  # pragma: allowlist secret
+            ),
         ]
 
         for endpoint, method, payload in error_test_cases:
@@ -238,7 +249,9 @@ class TestAPISpecificationCompliance:
                 resp = client.post(endpoint, json=payload)
 
             # Error responses should be JSON
-            assert resp.is_json, f"Error response from {method} {endpoint} should be JSON"
+            assert resp.is_json, (
+                f"Error response from {method} {endpoint} should be JSON"
+            )
 
             # Error responses should have error field
             if resp.status_code >= 400:

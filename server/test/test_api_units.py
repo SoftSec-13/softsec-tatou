@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from server import create_app
+from src.server import create_app
 
 
 class TestAPIUnits:
@@ -19,12 +19,14 @@ class TestAPIUnits:
     def app(self):
         """Create Flask app for testing."""
         app = create_app()
-        app.config.update({
-            "TESTING": True,
-            "SECRET_KEY": "test-secret-key",
-            "TOKEN_TTL_SECONDS": 3600,
-            "STORAGE_DIR": Path(tempfile.mkdtemp()),
-        })
+        app.config.update(
+            {
+                "TESTING": True,
+                "SECRET_KEY": "test-secret-key",  # pragma: allowlist secret
+                "TOKEN_TTL_SECONDS": 3600,
+                "STORAGE_DIR": Path(tempfile.mkdtemp()),
+            }
+        )
         return app
 
     @pytest.fixture
@@ -57,10 +59,7 @@ class TestAPIUnits:
 
     def test_create_user_validation_email_required(self, client):
         """Test user creation fails when email is missing."""
-        user_data = {
-            "login": "testuser",
-            "password": "securepass123"
-        }
+        user_data = {"login": "testuser", "password": "securepass123"}
 
         resp = client.post("/api/create-user", json=user_data)
 
@@ -73,10 +72,7 @@ class TestAPIUnits:
 
     def test_create_user_validation_login_required(self, client):
         """Test user creation fails when login is missing."""
-        user_data = {
-            "email": "test@example.com",
-            "password": "securepass123"
-        }
+        user_data = {"email": "test@example.com", "password": "securepass123"}
 
         resp = client.post("/api/create-user", json=user_data)
 
@@ -89,10 +85,7 @@ class TestAPIUnits:
 
     def test_create_user_validation_password_required(self, client):
         """Test user creation fails when password is missing."""
-        user_data = {
-            "email": "test@example.com",
-            "login": "testuser"
-        }
+        user_data = {"email": "test@example.com", "login": "testuser"}
 
         resp = client.post("/api/create-user", json=user_data)
 
@@ -133,18 +126,14 @@ class TestAPIUnits:
     def test_invalid_json_handling(self, client):
         """Test API gracefully handles invalid JSON."""
         resp = client.post(
-            "/api/create-user",
-            data="invalid json{",
-            content_type="application/json"
+            "/api/create-user", data="invalid json{", content_type="application/json"
         )
 
         # Should handle gracefully without crashing
         assert resp.status_code == 400
 
         resp = client.post(
-            "/api/login",
-            data="invalid json{",
-            content_type="application/json"
+            "/api/login", data="invalid json{", content_type="application/json"
         )
 
         assert resp.status_code == 400
