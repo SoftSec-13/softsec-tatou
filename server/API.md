@@ -501,7 +501,7 @@ On error:
 ```
 
 **Status Codes**
-- `200`: Success  
+- `200`: Success
 - `400`: Invalid payload or nonce not found
 - `503`: RMAP system initialization failed
 
