@@ -26,6 +26,7 @@ dev = [
 addopts = "-q"
 testpaths = ["test/"]
 python_files = ["test_*.py"]
+pythonpath = ["src"]
 
 [project.scripts]
 pdfwm = "watermarking_cli:main"                 # now you can run `pdfwm methods`
@@ -88,6 +89,7 @@ python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
+mypy_path = "src"
 exclude = [
     "migrations/",
     "venv/",
@@ -104,3 +106,11 @@ module = [
     "dill.*",
 ]
 ignore_missing_imports = true
+
+[tool.bandit]
+# Bandit configuration for security linting
+exclude_dirs = ["test", "tests", "build", "dist", ".venv", "venv"]
+skips = ["B101"]  # Skip assert_used for all files since tests legitimately use asserts
+
+[tool.bandit.assert_used]
+skips = ["**/test/**", "**/tests/**"]
