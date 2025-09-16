@@ -2,6 +2,7 @@ import datetime as dt
 import hashlib
 import os
 import re
+import time
 from functools import wraps
 from pathlib import Path
 
@@ -117,13 +118,42 @@ def create_app():
             app.logger.error(f"Failed to initialize RMAP system: {e}")
             raise
 
-    def _get_best_watermarking_method():
+    def get_best_method():
         """Get the best watermarking method available"""
         # Return the first available method as the "best" one
         # You can modify this logic based on your preferred method
         if WMUtils.METHODS:
             return WMUtils.METHODS[0]
         return None
+
+    def get_storage_path(filename):
+        """Get the full storage path for a file"""
+        return app.config["STORAGE_DIR"] / "files" / filename
+
+    def apply_watermark(original_path, dest_path, method, intended_for):
+        """Apply watermark to a PDF file"""
+        try:
+            # Generate a simple secret for watermarking
+            secret = f"rmap_secret_{intended_for}_{int(time.time())}"
+            key = "rmap_key_default"
+
+            # Use the watermarking utils to apply watermark
+            wm_bytes = WMUtils.apply_watermark(
+                pdf=str(original_path),
+                secret=secret,
+                key=key,
+                method=method,
+                position=None,
+            )
+
+            if wm_bytes:
+                with open(dest_path, "wb") as f:
+                    f.write(wm_bytes)
+                return True
+            return False
+        except Exception as e:
+            app.logger.error(f"Watermarking failed: {e}")
+            return False
 
     # --- Routes ---
 
@@ -981,7 +1011,7 @@ def create_app():
                 )
 
             # Get the best watermarking method
-            best_method = _get_best_watermarking_method()
+            best_method = get_best_method()
             if not best_method:
                 return jsonify({"error": "No watermarking methods available"}), 503
 
@@ -990,19 +1020,20 @@ def create_app():
             # the client specify
             try:
                 with get_engine().connect() as conn:
-                    # Get the first available PDF document
-                    row = conn.execute(
-                        text(
-                            """
-                            SELECT id, name, path
-                            FROM Documents
-                            ORDER BY creation DESC
-                            LIMIT 1
+                    stmt = text(
                         """
-                        )
-                    ).first()
+                        SELECT id, title, filename, file_size, upload_date
+                        FROM documents
+                        WHERE filename LIKE '%.pdf'
+                        ORDER BY upload_date DESC
+                        LIMIT 1
+                    """
+                    )
+                    result = conn.execute(stmt)
+                    row = result.fetchone()
+
             except Exception as e:
-                app.logger.error(f"Database error finding document: {e}")
+                app.logger.error(f"Database error fetching document: {e}")
                 return jsonify({"error": "Database error"}), 503
 
             if not row:
@@ -1021,73 +1052,51 @@ def create_app():
                     )
             except Exception:
                 # Fallback to using session secret as identity
-                identity = "unknown_group"
+                identity = f"session_{session_secret[:8]}"
 
-            # Resolve file path
-            storage_root = Path(app.config["STORAGE_DIR"]).resolve()
-            file_path = Path(row.path)
-            if not file_path.is_absolute():
-                file_path = storage_root / file_path
-            file_path = file_path.resolve()
-
+            # Create watermarked PDF
             try:
-                file_path.relative_to(storage_root)
-            except ValueError:
-                return jsonify({"error": "Invalid document path"}), 500
+                doc_id, title, filename, file_size, upload_date = row
+                original_path = get_storage_path(filename)
 
-            if not file_path.exists():
-                return jsonify({"error": "Document file not found"}), 410
+                if not original_path.exists():
+                    return jsonify({"error": "Original file not found"}), 404
 
-            # Apply watermark using best technique
-            try:
-                # Use session secret as both secret and key for watermarking
-                wm_bytes = WMUtils.apply_watermark(
-                    pdf=str(file_path),
-                    secret=session_secret[:32],  # Truncate to reasonable length
-                    key=session_secret[:32],
-                    method=best_method,
-                    position=None,
+                # Create link from session secret (first 32 characters as hex)
+                link_hex = session_secret[:32]
+
+                # Create destination filename for watermarked version
+                dest_filename = f"rmap_{link_hex}_{filename}"
+                dest_path = get_storage_path(dest_filename)
+
+                # Apply watermark
+                watermark_result = apply_watermark(
+                    original_path, dest_path, best_method, identity
                 )
 
-                if not isinstance(wm_bytes, bytes) or len(wm_bytes) == 0:
-                    return jsonify({"error": "Watermarking produced no output"}), 500
+                if not watermark_result or not dest_path.exists():
+                    return jsonify({"error": "Failed to create watermarked PDF"}), 503
 
             except Exception as e:
-                app.logger.error(f"Watermarking failed: {e}")
-                return jsonify({"error": "Watermarking failed"}), 500
+                app.logger.error(f"Error creating watermarked PDF: {e}")
+                return jsonify({"error": "Watermarking failed"}), 503
 
-            # Create watermarked file
-            base_name = Path(row.name or file_path.name).stem
-            intended_slug = secure_filename(identity)
-            dest_dir = file_path.parent / "rmap_watermarks"
-            dest_dir.mkdir(parents=True, exist_ok=True)
-
-            candidate = f"{base_name}__rmap__{intended_slug}.pdf"
-            dest_path = dest_dir / candidate
-
+            # Store RMAP version info in database
             try:
-                with dest_path.open("wb") as f:
-                    f.write(wm_bytes)
-            except Exception as e:
-                return jsonify({"error": f"Failed to write watermarked file: {e}"}), 500
-
-            # Generate link from session secret (32-hex as specified)
-            link_hex = hashlib.sha256(session_secret.encode()).hexdigest()[:32]
-
-            # Store in database
-            try:
-                with get_engine().begin() as conn:
-                    conn.execute(
-                        text(
-                            """
-                            INSERT INTO Versions (documentid, link, intended_for,
-                                                secret, method, position, path)
-                            VALUES (:documentid, :link, :intended_for, :secret,
-                                   :method, :position, :path)
+                with get_engine().connect() as conn:
+                    stmt = text(
                         """
-                        ),
+                        INSERT INTO watermarked_versions
+                        (original_id, link, intended_for, secret, method,
+                         position, path)
+                        VALUES (:original_id, :link, :intended_for, :secret,
+                               :method, :position, :path)
+                    """
+                    )
+                    conn.execute(
+                        stmt,
                         {
-                            "documentid": int(row.id),
+                            "original_id": doc_id,
                             "link": link_hex,
                             "intended_for": identity,
                             "secret": session_secret[:32],
@@ -1096,6 +1105,7 @@ def create_app():
                             "path": str(dest_path),
                         },
                     )
+                    conn.commit()
             except Exception as e:
                 # Clean up file on DB error
                 try:
