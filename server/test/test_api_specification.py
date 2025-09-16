@@ -5,12 +5,16 @@ defined in API.md. This includes testing all required endpoints,
 response formats, status codes, and error handling.
 """
 
+import sys
 import tempfile
 from pathlib import Path
 
 import pytest
 
-from src.server import create_app
+# Add the src directory to the Python path
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+from server import create_app
 
 
 class TestAPISpecificationCompliance:

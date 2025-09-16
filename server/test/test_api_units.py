@@ -4,12 +4,16 @@ These tests focus on testing API endpoint logic, validation, and error handling
 without requiring a running database connection.
 """
 
+import sys
 import tempfile
 from pathlib import Path
 
 import pytest
 
-from src.server import create_app
+# Add the src directory to the Python path
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+from server import create_app
 
 
 class TestAPIUnits:

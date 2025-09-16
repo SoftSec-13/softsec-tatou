@@ -5,13 +5,17 @@ These tests cover the RMAP (Roger Michael Authentication Protocol) implementatio
 including both the initiate and get-link endpoints.
 """
 
+import sys
 import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
 
-from src.server import create_app
+# Add the src directory to the Python path
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+from server import create_app
 
 
 class TestRMAPRoutes:
@@ -98,7 +102,7 @@ class TestRMAPRoutes:
 
     def test_rmap_initiate_success(self, client, mock_rmap_system):
         """Test successful RMAP initiate request."""
-        with patch("src.server._get_rmap_system", return_value=mock_rmap_system):
+        with patch("server._get_rmap_system", return_value=mock_rmap_system):
             response = client.post(
                 "/rmap-initiate", json={"payload": "encrypted_message_1_base64"}
             )
@@ -130,7 +134,7 @@ class TestRMAPRoutes:
     def test_rmap_initiate_rmap_system_failure(self, client):
         """Test RMAP initiate when RMAP system initialization fails."""
         with patch(
-            "src.server._get_rmap_system", side_effect=Exception("RMAP init failed")
+            "server._get_rmap_system", side_effect=Exception("RMAP init failed")
         ):
             response = client.post(
                 "/rmap-initiate", json={"payload": "encrypted_message_1_base64"}
@@ -144,7 +148,7 @@ class TestRMAPRoutes:
         """Test RMAP initiate with invalid message."""
         mock_rmap_system.process_message_1.side_effect = Exception("Invalid message")
 
-        with patch("src.server._get_rmap_system", return_value=mock_rmap_system):
+        with patch("server._get_rmap_system", return_value=mock_rmap_system):
             response = client.post(
                 "/rmap-initiate", json={"payload": "invalid_encrypted_message"}
             )
@@ -165,12 +169,10 @@ class TestRMAPRoutes:
         mock_watermark_bytes = b"%PDF-1.4\nwatermarked pdf content"
 
         with (
-            patch("src.server._get_rmap_system", return_value=mock_rmap_system),
-            patch("src.server.get_engine") as mock_engine,
-            patch("src.server._get_best_watermarking_method", return_value="method1"),
-            patch(
-                "src.server.WMUtils.apply_watermark", return_value=mock_watermark_bytes
-            ),
+            patch("server._get_rmap_system", return_value=mock_rmap_system),
+            patch("server.get_engine") as mock_engine,
+            patch("server._get_best_watermarking_method", return_value="method1"),
+            patch("server.WMUtils.apply_watermark", return_value=mock_watermark_bytes),
         ):
             # Setup database mock
             mock_engine.return_value.connect.return_value.__enter__.return_value = (
@@ -203,7 +205,7 @@ class TestRMAPRoutes:
     def test_rmap_get_link_rmap_system_failure(self, client):
         """Test RMAP get-link when RMAP system initialization fails."""
         with patch(
-            "src.server._get_rmap_system", side_effect=Exception("RMAP init failed")
+            "server._get_rmap_system", side_effect=Exception("RMAP init failed")
         ):
             response = client.post(
                 "/rmap-get-link", json={"payload": "encrypted_message_2_base64"}
@@ -217,7 +219,7 @@ class TestRMAPRoutes:
         """Test RMAP get-link with invalid message."""
         mock_rmap_system.process_message_2.side_effect = Exception("Invalid message")
 
-        with patch("src.server._get_rmap_system", return_value=mock_rmap_system):
+        with patch("server._get_rmap_system", return_value=mock_rmap_system):
             response = client.post(
                 "/rmap-get-link", json={"payload": "invalid_encrypted_message"}
             )
@@ -230,7 +232,7 @@ class TestRMAPRoutes:
         """Test RMAP get-link when no session secret is returned."""
         mock_rmap_system.process_message_2.return_value = None
 
-        with patch("src.server._get_rmap_system", return_value=mock_rmap_system):
+        with patch("server._get_rmap_system", return_value=mock_rmap_system):
             response = client.post(
                 "/rmap-get-link", json={"payload": "encrypted_message_2_base64"}
             )
@@ -242,8 +244,8 @@ class TestRMAPRoutes:
     def test_rmap_get_link_no_watermarking_method(self, client, mock_rmap_system):
         """Test RMAP get-link when no watermarking method is available."""
         with (
-            patch("src.server._get_rmap_system", return_value=mock_rmap_system),
-            patch("src.server._get_best_watermarking_method", return_value=None),
+            patch("server._get_rmap_system", return_value=mock_rmap_system),
+            patch("server._get_best_watermarking_method", return_value=None),
         ):
             response = client.post(
                 "/rmap-get-link", json={"payload": "encrypted_message_2_base64"}
@@ -260,9 +262,9 @@ class TestRMAPRoutes:
         mock_db_connection.execute.return_value.first.return_value = None
 
         with (
-            patch("src.server._get_rmap_system", return_value=mock_rmap_system),
-            patch("src.server.get_engine") as mock_engine,
-            patch("src.server._get_best_watermarking_method", return_value="method1"),
+            patch("server._get_rmap_system", return_value=mock_rmap_system),
+            patch("server.get_engine") as mock_engine,
+            patch("server._get_best_watermarking_method", return_value="method1"),
         ):
             mock_engine.return_value.connect.return_value.__enter__.return_value = (
                 mock_db_connection
@@ -281,9 +283,9 @@ class TestRMAPRoutes:
     ):
         """Test RMAP get-link when document file doesn't exist."""
         with (
-            patch("src.server._get_rmap_system", return_value=mock_rmap_system),
-            patch("src.server.get_engine") as mock_engine,
-            patch("src.server._get_best_watermarking_method", return_value="method1"),
+            patch("server._get_rmap_system", return_value=mock_rmap_system),
+            patch("server.get_engine") as mock_engine,
+            patch("server._get_best_watermarking_method", return_value="method1"),
         ):
             mock_engine.return_value.connect.return_value.__enter__.return_value = (
                 mock_db_connection
@@ -307,9 +309,9 @@ class TestRMAPRoutes:
         test_pdf.write_bytes(b"%PDF-1.4\ntest pdf content")
 
         with (
-            patch("src.server._get_rmap_system", return_value=mock_rmap_system),
-            patch("src.server.get_engine") as mock_engine,
-            patch("src.server._get_best_watermarking_method", return_value="method1"),
+            patch("server._get_rmap_system", return_value=mock_rmap_system),
+            patch("server.get_engine") as mock_engine,
+            patch("server._get_best_watermarking_method", return_value="method1"),
             patch(
                 "server.WMUtils.apply_watermark",
                 side_effect=Exception("Watermarking failed"),
@@ -337,9 +339,9 @@ class TestRMAPRoutes:
         test_pdf.write_bytes(b"%PDF-1.4\ntest pdf content")
 
         with (
-            patch("src.server._get_rmap_system", return_value=mock_rmap_system),
-            patch("src.server.get_engine") as mock_engine,
-            patch("src.server._get_best_watermarking_method", return_value="method1"),
+            patch("server._get_rmap_system", return_value=mock_rmap_system),
+            patch("server.get_engine") as mock_engine,
+            patch("server._get_best_watermarking_method", return_value="method1"),
             patch("server.WMUtils.apply_watermark", return_value=b""),
         ):
             mock_engine.return_value.connect.return_value.__enter__.return_value = (

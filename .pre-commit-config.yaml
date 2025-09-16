@@ -47,7 +47,7 @@ repos:
     hooks:
       - id: mypy
         args: [--ignore-missing-imports]
-        exclude: ^(test/|migrations/)
+        exclude: ^(test/|migrations/|server/test/)
 
   # Environment files check
   - repo: https://github.com/Yelp/detect-secrets
