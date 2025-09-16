@@ -273,7 +273,7 @@ class RobustXmpWatermark(WatermarkingMethod):
         encrypted = salt + nonce + ciphertext
         return base64.b64encode(encrypted).decode("ascii")
 
-    def _decrypt_payload(self, encrypted_b64: str, key: bytes) -> dict[str, Any]:
+    def _decrypt_payload(self, key: bytes) -> dict[str, Any]:
         """Decrypt payload using AES-GCM (legacy method)."""
         # This method is kept for compatibility but the main decryption
         # is now handled in _decrypt_and_extract_secret
