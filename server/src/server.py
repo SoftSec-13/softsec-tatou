@@ -896,7 +896,6 @@ def create_app():
             }
         ), 201
 
-
     # @app.post("/api/load-plugin")
     # @require_auth
     # def load_plugin():
