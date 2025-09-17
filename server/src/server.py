@@ -370,14 +370,15 @@ def create_app():
                 """),
                     {"did": document_id, "uid": int(g.user["id"])},
                 ).first()
+
                 if not doc:
                     return jsonify({"error": "document not found"}), 404
 
-                # Then fetch versions with ownership validation (within same connection)
+                # Then fetch versions with ownership validation
                 rows = conn.execute(
                     text("""
                         SELECT v.id, v.documentid, v.link, v.intended_for,
-                               v.secret, v.method
+                            v.secret, v.method
                         FROM Documents d
                         JOIN Versions v ON d.id = v.documentid
                         WHERE d.id = :did AND d.ownerid = :uid
@@ -654,32 +655,50 @@ def create_app():
         return fp
 
     # DELETE /api/delete-document  (and variants) POST supported for convenience
-    # @app.route("/api/delete-document", methods=["DELETE", "POST"])
-    # @app.route("/api/delete-document/<document_id>", methods=["DELETE"])
+    @app.route("/api/delete-document", methods=["DELETE", "POST"])
+    @app.route("/api/delete-document/<document_id>", methods=["DELETE"])
     @require_auth
     def delete_document(document_id: int | None = None):
         # accept id from path, query (?id= / ?documentid=), or JSON body on POST
-        if not document_id:
+        if document_id in (None, ""):
             document_id = (
                 request.args.get("id")
                 or request.args.get("documentid")
                 or (request.is_json and (request.get_json(silent=True) or {}).get("id"))
             )
+
+        if document_id is None:
+            return jsonify({"error": "document id required"}), 400
+
         try:
-            doc_id = document_id
+            doc_id = int(document_id)
         except (TypeError, ValueError):
             return jsonify({"error": "document id required"}), 400
 
+        if doc_id <= 0:
+            return jsonify({"error": "document id required"}), 400
+
+        owner_id = int(g.user["id"])
+
         # Fetch the document (enforce ownership)
         try:
-            if doc_id is None:
-                return jsonify({"error": "document id required"}), 400
             with get_engine().connect() as conn:
                 row = conn.execute(
-                    text("SELECT * FROM Documents WHERE id = :id"), {"id": doc_id}
+                    text(
+                        """
+                        SELECT id, path
+                        FROM Documents
+                        WHERE id = :id AND ownerid = :owner
+                        LIMIT 1
+                    """
+                    ),
+                    {"id": doc_id, "owner": owner_id},
                 ).first()
         except Exception as e:
-            return jsonify({"error": f"database error: {str(e)}"}), 503
+            # Log error and return generic message
+            app.logger.error("DB delete error for doc id=%s: %s", doc_id, e)
+            # Return generic error message
+            return jsonify({"error": "database error during delete"}), 503
 
         if not row:
             # Don’t reveal others’ docs—just say not found
@@ -716,10 +735,14 @@ def create_app():
                 # conn.execute(text("DELETE FROM Version WHERE documentid = :id"),
                 #              {"id": doc_id})
                 conn.execute(
-                    text("DELETE FROM Documents WHERE id = :id"), {"id": doc_id}
+                    text("DELETE FROM Documents WHERE id = :id AND ownerid = :owner"),
+                    {"id": doc_id, "owner": owner_id},
                 )
         except Exception as e:
-            return jsonify({"error": f"database error during delete: {str(e)}"}), 503
+            # Log error but don’t mask file deletion status
+            app.logger.error("DB delete error for doc id=%s: %s", doc_id, e)
+            # Return generic error message
+            return jsonify({"error": "database error during delete"}), 503
 
         return jsonify(
             {
@@ -733,8 +756,8 @@ def create_app():
 
     # POST /api/create-watermark or /api/create-watermark/<id>
     # → create watermarked pdf and returns metadata
-    @app.post("/api/create-watermark")
-    @app.post("/api/create-watermark/<int:document_id>")
+    # @app.post("/api/create-watermark")
+    # @app.post("/api/create-watermark/<int:document_id>")
     @require_auth
     def create_watermark(document_id: int | None = None):
         # accept id from path, query (?id= / ?documentid=), or JSON body on GET
@@ -989,8 +1012,8 @@ def create_app():
         return jsonify({"methods": methods, "count": len(methods)}), 200
 
     # POST /api/read-watermark
-    @app.post("/api/read-watermark")
-    @app.post("/api/read-watermark/<int:document_id>")
+    # @app.post("/api/read-watermark")
+    # @app.post("/api/read-watermark/<int:document_id>")
     @require_auth
     def read_watermark(document_id: int | None = None):
         # accept id from path, query (?id= / ?documentid=), or JSON body on POST
