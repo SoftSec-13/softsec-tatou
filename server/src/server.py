@@ -656,8 +656,8 @@ def create_app():
         return fp
 
     # DELETE /api/delete-document  (and variants) POST supported for convenience
-    @app.route("/api/delete-document", methods=["DELETE", "POST"])
-    @app.route("/api/delete-document/<document_id>", methods=["DELETE"])
+    # @app.route("/api/delete-document", methods=["DELETE", "POST"])
+    # @app.route("/api/delete-document/<document_id>", methods=["DELETE"])
     @require_auth
     def delete_document(document_id: int | None = None):
         # accept id from path, query (?id= / ?documentid=), or JSON body on POST
