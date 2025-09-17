@@ -12,7 +12,14 @@ from sqlalchemy.exc import IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
+# try:
+#     import dill as _pickle  # allows loading classes not importable by module path
+# except Exception:  # dill is optional
+#     _pickle = _std_pickle
 import watermarking_utils as WMUtils
+
+# from watermarking_utils import METHODS, apply_watermark, read_watermark, explore_pdf,
+# \is_watermarking_applicable, get_method
 
 
 def create_app():
@@ -363,7 +370,6 @@ def create_app():
                 """),
                     {"did": document_id, "uid": int(g.user["id"])},
                 ).first()
-
                 if not doc:
                     return jsonify({"error": "document not found"}), 404
 
@@ -469,52 +475,97 @@ def create_app():
                     {"id": document_id, "uid": int(g.user["id"])},
                 ).first()
         except Exception as e:
-            return jsonify({"error": f"database error: {str(e)}"}), 503
+            # Log error and return generic message
+            app.logger.error(f"Database error in get_document: {str(e)}")
+            # Return generic error message
+            return jsonify(
+                {"error": "An error occurred while fetching the document"}
+            ), 503
 
         # Don’t leak whether a doc exists for another user
         if not row:
             return jsonify({"error": "document not found"}), 404
 
+        storage_root = app.config["STORAGE_DIR"].resolve()
         file_path = Path(row.path)
 
         # Basic safety: ensure path is inside STORAGE_DIR and exists
         try:
-            file_path.resolve().relative_to(app.config["STORAGE_DIR"].resolve())
+            resolved = file_path.resolve()
+            resolved.relative_to(storage_root)
         except Exception:
             # Path looks suspicious or outside storage
             return jsonify({"error": "document path invalid"}), 500
 
-        if not file_path.exists():
+        if not resolved.exists():
             return jsonify({"error": "file missing on disk"}), 410
 
-        # Serve inline with caching hints + ETag based on stored sha256
-        resp = send_file(
-            file_path,
-            mimetype="application/pdf",
-            as_attachment=False,
-            download_name=row.name
-            if row.name.lower().endswith(".pdf")
-            else f"{row.name}.pdf",
-            conditional=True,  # enables 304 if If-Modified-Since/Range handling
-            max_age=0,
-            last_modified=file_path.stat().st_mtime,
-        )
-        # Strong validator
-        if isinstance(row.sha256_hex, str) and row.sha256_hex:
-            resp.set_etag(row.sha256_hex.lower())
+        # TOCTOU-safe open and validation
+        try:
+            f = open(resolved, "rb")
+        except OSError:
+            return jsonify({"error": "file missing on disk"}), 410
 
-        resp.headers["Cache-Control"] = "private, max-age=0, must-revalidate"
-        return resp
+        try:
+            # Quick PDF signature check
+            head = f.read(5)
+            if head != b"%PDF-":
+                f.close()
+                return jsonify({"error": "document not available"}), 415
+
+            f.seek(0)
+
+            # Prepare safe filename (preserve existing .pdf if present)
+            name = (row.name or "document").strip().replace("\r", "").replace("\n", "")
+            if not name.lower().endswith(".pdf"):
+                name = f"{name}.pdf"
+
+            # Stat via the same FD to avoid TOCTOU
+            st = os.fstat(f.fileno())
+
+            resp = send_file(
+                file_path,
+                mimetype="application/pdf",
+                as_attachment=False,
+                download_name=name,
+                conditional=False,  # enables 304 if If-Modified-Since/Range handling
+                max_age=0,
+                last_modified=st.st_mtime,
+            )
+
+            # Strong validator
+            if isinstance(row.sha256_hex, str) and row.sha256_hex:
+                resp.set_etag(row.sha256_hex.lower())
+
+            # Headers
+            resp.headers["Content-Type"] = "application/pdf"
+            resp.headers["Content-Disposition"] = f'inline; filename="{name}"'
+            resp.headers["Cache-Control"] = "private, max-age=0, must-revalidate"
+            resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+            resp.headers.setdefault(
+                "Content-Security-Policy", "sandbox; default-src 'none'"
+            )
+
+            return resp
+        except Exception as e:
+            f.close()
+            # Log error and return generic message
+            app.logger.error(f"Error serving file: {str(e)}")
+            return jsonify({"error": "error serving file"}), 500
 
     # GET /api/get-version/<link>  → returns the watermarked PDF (inline)
     @app.get("/api/get-version/<link>")
     def get_version(link: str):
+        # Expect SHA-256 style tokens to reduce brute-force signal and header abuse
+        if not re.fullmatch(r"[0-9a-f]{64}", link):
+            return jsonify({"error": "document not found"}), 404
+
         try:
             with get_engine().connect() as conn:
                 row = conn.execute(
                     text(
                         """
-                        SELECT *
+                        SELECT path, link
                         FROM Versions
                         WHERE link = :link
                         LIMIT 1
@@ -523,38 +574,63 @@ def create_app():
                     {"link": link},
                 ).first()
         except Exception as e:
-            return jsonify({"error": f"database error: {str(e)}"}), 503
+            app.logger.error("Database error in get_version: %s", e)
+            return jsonify({"error": "database error"}), 503
 
-        # Don’t leak whether a doc exists for another user
         if not row:
             return jsonify({"error": "document not found"}), 404
 
-        file_path = Path(row.path)
-
-        # Basic safety: ensure path is inside STORAGE_DIR and exists
         try:
-            file_path.resolve().relative_to(app.config["STORAGE_DIR"].resolve())
-        except Exception:
-            # Path looks suspicious or outside storage
+            resolved = _safe_resolve_under_storage(row.path, app.config["STORAGE_DIR"])
+        except Exception as exc:
+            app.logger.warning(
+                "Rejected version path for link %s: %s (%s)", link, row.path, exc
+            )
             return jsonify({"error": "document path invalid"}), 500
 
-        if not file_path.exists():
+        if not resolved.exists():
             return jsonify({"error": "file missing on disk"}), 410
 
-        # Serve inline with caching hints + ETag based on stored sha256
-        resp = send_file(
-            file_path,
-            mimetype="application/pdf",
-            as_attachment=False,
-            download_name=row.link
-            if row.link.lower().endswith(".pdf")
-            else f"{row.link}.pdf",
-            conditional=True,  # enables 304 if If-Modified-Since/Range handling
-            max_age=0,
-            last_modified=file_path.stat().st_mtime,
+        try:
+            with resolved.open("rb") as fh:
+                header = fh.read(5)
+                if header != b"%PDF-":
+                    return jsonify({"error": "document not available"}), 415
+                fh.seek(0)
+                last_modified = os.fstat(fh.fileno()).st_mtime
+        except OSError:
+            return jsonify({"error": "file missing on disk"}), 410
+        except Exception as e:
+            app.logger.error("Error inspecting version file for %s: %s", link, e)
+            return jsonify({"error": "error serving file"}), 500
+
+        download_name = (
+            row.link if row.link.lower().endswith(".pdf") else f"{row.link}.pdf"
+        )
+        safe_download = download_name.replace("\r", "").replace("\n", "")
+
+        try:
+            resp = send_file(
+                resolved,
+                mimetype="application/pdf",
+                as_attachment=False,
+                download_name=safe_download,
+                conditional=True,
+                max_age=0,
+                last_modified=last_modified,
+            )
+        except Exception as e:
+            app.logger.error("Error serving version %s: %s", link, e)
+            return jsonify({"error": "error serving file"}), 500
+
+        resp.headers["Cache-Control"] = "private, max-age=0, must-revalidate"
+        resp.headers["Content-Type"] = "application/pdf"
+        resp.headers["Content-Disposition"] = f'inline; filename="{safe_download}"'
+        resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+        resp.headers.setdefault(
+            "Content-Security-Policy", "sandbox; default-src 'none'"
         )
 
-        resp.headers["Cache-Control"] = "private, max-age=0"
         return resp
 
     # Helper: resolve path safely under STORAGE_DIR (handles absolute/relative)
@@ -577,10 +653,10 @@ def create_app():
                 ) from None
         return fp
 
-    # DELETE /api/delete-document  (and variants)
-    @app.route("/api/delete-document", methods=["DELETE", "POST"])
-    # POST supported for convenience
-    @app.route("/api/delete-document/<document_id>", methods=["DELETE"])
+    # DELETE /api/delete-document  (and variants) POST supported for convenience
+    # @app.route("/api/delete-document", methods=["DELETE", "POST"])
+    # @app.route("/api/delete-document/<document_id>", methods=["DELETE"])
+    @require_auth
     def delete_document(document_id: int | None = None):
         # accept id from path, query (?id= / ?documentid=), or JSON body on POST
         if not document_id:
@@ -820,16 +896,85 @@ def create_app():
             }
         ), 201
 
-    @app.post("/api/load-plugin")
-    @require_auth
-    def load_plugin():
-        """
-        Plugin loading has been disabled for security reasons.
-        Pickle deserialization can execute arbitrary code and poses a security risk.
-        """
-        return jsonify(
-            {"error": "Plugin loading is disabled for security reasons"}
-        ), 501
+
+    # @app.post("/api/load-plugin")
+    # @require_auth
+    # def load_plugin():
+    #     """
+    #     Load a serialized Python class implementing WatermarkingMethod from
+    #     STORAGE_DIR/files/plugins/<filename>.{pkl|dill} and register it in
+    # \wm_mod.METHODS.
+    #     Body: { "filename": "MyMethod.pkl", "overwrite": false }
+    #     """
+    #     payload = request.get_json(silent=True) or {}
+    #     filename = (payload.get("filename") or "").strip()
+    #     overwrite = bool(payload.get("overwrite", False))
+
+    #     if not filename:
+    #         return jsonify({"error": "filename is required"}), 400
+
+    #     # Locate the plugin in /storage/files/plugins (relative to STORAGE_DIR)
+    #     storage_root = Path(app.config["STORAGE_DIR"])
+    #     plugins_dir = storage_root / "files" / "plugins"
+    #     try:
+    #         plugins_dir.mkdir(parents=True, exist_ok=True)
+    #         plugin_path = plugins_dir / filename
+    #     except Exception as e:
+    #         return jsonify({"error": f"plugin path error: {e}"}), 500
+
+    #     if not plugin_path.exists():
+    #         return jsonify({"error": f"plugin file not found: {filename}"}), 404
+
+    #     # Unpickle the object (dill if available; else std pickle)
+    #     try:
+    #         with plugin_path.open("rb") as f:
+    #             obj = _pickle.load(f)
+    #     except Exception as e:
+    #         return jsonify({"error": f"failed to deserialize plugin: {e}"}), 400
+
+    #     # Accept: class object, or instance (we'll promote instance to its class)
+    #     if isinstance(obj, type):
+    #         cls = obj
+    #     else:
+    #         cls = obj.__class__
+
+    #     # Determine method name for registry
+    #     method_name = getattr(cls, "name", getattr(cls, "__name__", None))
+    #     if not method_name or not isinstance(method_name, str):
+    #         return jsonify(
+    #             {
+    #                 "error": "plugin class must define a readable name \
+    # (class.__name__ or .name)"
+    #             }
+    #         ), 400
+
+    #     # Validate interface: either subclass of WatermarkingMethod or duck-typing
+    #     has_api = all(hasattr(cls, attr) for attr in ("add_watermark", "read_secret"))
+    #     if WatermarkingMethod is not None:
+    #         is_ok = issubclass(cls, WatermarkingMethod) and has_api
+    #     else:
+    #         is_ok = has_api
+    #     if not is_ok:
+    #         return jsonify(
+    #             {
+    #                 "error": "plugin does not implement WatermarkingMethod API
+    # \(add_watermark/read_secret)"
+    #             }
+    #         ), 400
+
+    #     # Register the class (not an instance) so you can instantiate as needed later
+    #     WMUtils.METHODS[method_name] = cls()
+
+    #     return jsonify(
+    #         {
+    #             "loaded": True,
+    #             "filename": filename,
+    #             "registered_as": method_name,
+    #             "class_qualname": f"{getattr(cls, '__module__', '?')}
+    # \.{getattr(cls, '__qualname__', cls.__name__)}",
+    #             "methods_count": len(WMUtils.METHODS),
+    #         }
+    #     ), 201
 
     # GET /api/get-watermarking-methods
     # → {"methods":[{"name":..., "description":...}, ...], "count":N}
