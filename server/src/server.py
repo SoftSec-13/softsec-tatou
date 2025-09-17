@@ -364,21 +364,21 @@ def create_app():
                     {"did": document_id, "uid": int(g.user["id"])},
                 ).first()
 
-            if not doc:
-                return jsonify({"error": "document not found"}), 404
+                if not doc:
+                    return jsonify({"error": "document not found"}), 404
 
-            # Then fetch versions with ownership validation
-            rows = conn.execute(
-                text("""
-                    SELECT v.id, v.documentid, v.link, v.intended_for,
-                           v.secret, v.method
-                    FROM Documents d
-                    JOIN Versions v ON d.id = v.documentid
-                    WHERE d.id = :did AND d.ownerid = :uid
-                    ORDER BY v.id DESC
-                """),
-                {"did": document_id, "uid": int(g.user["id"])},
-            ).all()
+                # Then fetch versions with ownership validation (within same connection)
+                rows = conn.execute(
+                    text("""
+                        SELECT v.id, v.documentid, v.link, v.intended_for,
+                               v.secret, v.method
+                        FROM Documents d
+                        JOIN Versions v ON d.id = v.documentid
+                        WHERE d.id = :did AND d.ownerid = :uid
+                        ORDER BY v.id DESC
+                    """),
+                    {"did": document_id, "uid": int(g.user["id"])},
+                ).all()
         except Exception as e:
             # Log the full error for debugging
             app.logger.error(f"Database error in list_versions: {str(e)}")
@@ -443,8 +443,8 @@ def create_app():
         return jsonify({"versions": versions}), 200
 
     # GET /api/get-document or /api/get-document/<id>  → returns the PDF (inline)
-    # @app.get("/api/get-document")
-    # @app.get("/api/get-document/<int:document_id>")
+    @app.get("/api/get-document")
+    @app.get("/api/get-document/<int:document_id>")
     @require_auth
     def get_document(document_id: int | None = None):
         # Support both path param and ?id=/ ?documentid=
@@ -507,7 +507,7 @@ def create_app():
         return resp
 
     # GET /api/get-version/<link>  → returns the watermarked PDF (inline)
-    # @app.get("/api/get-version/<link>")
+    @app.get("/api/get-version/<link>")
     def get_version(link: str):
         try:
             with get_engine().connect() as conn:
@@ -578,9 +578,9 @@ def create_app():
         return fp
 
     # DELETE /api/delete-document  (and variants)
-    # @app.route("/api/delete-document", methods=["DELETE", "POST"])
+    @app.route("/api/delete-document", methods=["DELETE", "POST"])
     # POST supported for convenience
-    # @app.route("/api/delete-document/<document_id>", methods=["DELETE"])
+    @app.route("/api/delete-document/<document_id>", methods=["DELETE"])
     def delete_document(document_id: int | None = None):
         # accept id from path, query (?id= / ?documentid=), or JSON body on POST
         if not document_id:
@@ -657,8 +657,8 @@ def create_app():
 
     # POST /api/create-watermark or /api/create-watermark/<id>
     # → create watermarked pdf and returns metadata
-    # @app.post("/api/create-watermark")
-    # @app.post("/api/create-watermark/<int:document_id>")
+    @app.post("/api/create-watermark")
+    @app.post("/api/create-watermark/<int:document_id>")
     @require_auth
     def create_watermark(document_id: int | None = None):
         # accept id from path, query (?id= / ?documentid=), or JSON body on GET
@@ -820,7 +820,7 @@ def create_app():
             }
         ), 201
 
-    # @app.post("/api/load-plugin")
+    @app.post("/api/load-plugin")
     @require_auth
     def load_plugin():
         """
@@ -833,7 +833,7 @@ def create_app():
 
     # GET /api/get-watermarking-methods
     # → {"methods":[{"name":..., "description":...}, ...], "count":N}
-    # @app.get("/api/get-watermarking-methods")
+    @app.get("/api/get-watermarking-methods")
     def get_watermarking_methods():
         methods = []
 
@@ -845,8 +845,8 @@ def create_app():
         return jsonify({"methods": methods, "count": len(methods)}), 200
 
     # POST /api/read-watermark
-    # @app.post("/api/read-watermark")
-    # @app.post("/api/read-watermark/<int:document_id>")
+    @app.post("/api/read-watermark")
+    @app.post("/api/read-watermark/<int:document_id>")
     @require_auth
     def read_watermark(document_id: int | None = None):
         # accept id from path, query (?id= / ?documentid=), or JSON body on POST
