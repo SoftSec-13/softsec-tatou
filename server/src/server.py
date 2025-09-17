@@ -14,34 +14,6 @@ from werkzeug.utils import secure_filename
 
 import watermarking_utils as WMUtils
 
-try:
-    # Try to import the real RMAP library first
-    import importlib.util
-
-    # Check if rmap modules are available without importing unused classes
-    rmap_spec = importlib.util.find_spec("rmap.identity_manager")
-    rmap_rmap_spec = importlib.util.find_spec("rmap.rmap")
-
-    if rmap_spec is not None and rmap_rmap_spec is not None:
-        # Real RMAP library is available but not used in current implementation
-        # Initialize RMAP with mock data for now
-        # In production, proper PGP keys would be configured
-        _rmap_identity_manager = None
-        _rmap_instance = None
-
-        def get_rmap_instance():
-            """Get RMAP instance (using real library)."""
-            global _rmap_identity_manager, _rmap_instance
-            if _rmap_instance is None:
-                raise RuntimeError("RMAP system not properly initialized")
-            return _rmap_instance
-    else:
-        raise ImportError("RMAP library not available")
-
-except ImportError:
-    # Fallback to mock implementation for development/testing
-    from rmap_mock import get_rmap_instance
-
 
 def create_app():
     app = Flask(__name__)
@@ -179,7 +151,6 @@ def create_app():
         except IntegrityError:
             return jsonify({"error": "email or login already exists"}), 409
         except Exception as e:
-            # Log error and return generic message
             app.logger.error("Database error in create_user: %s", e)
             return jsonify({"error": "database error"}), 503
 
@@ -218,7 +189,6 @@ def create_app():
                     return jsonify({"error": "invalid credentials"}), 401
 
         except Exception as e:
-            # Log error and return generic message
             app.logger.error(f"Database error in login: {str(e)}")
             return jsonify({"error": "An error occurred"}), 503
 
@@ -303,7 +273,8 @@ def create_app():
                     text(
                         """
                         SELECT id, name, creation, HEX(sha256) AS sha256_hex, size
-                        FROM Documents WHERE id = :id
+                        FROM Documents
+                        WHERE id = :id
                     """
                     ),
                     {"id": did},
@@ -1057,71 +1028,6 @@ def create_app():
                 "position": position,
             }
         ), 201
-
-    # POST /rmap-initiate - RMAP Message 1 Handler
-    @app.post("/rmap-initiate")
-    def rmap_initiate():
-        """
-        Handle RMAP Message 1: Client authentication initiation.
-
-        Expected payload: {"payload": "<base64-encoded-pgp-message>"}
-        The decrypted message should contain:
-        {"nonceClient": <u64>, "identity": "<str>"}
-
-        Returns:
-        - On success: {"payload": "<base64-encoded-pgp-response>"}
-        - On error: {"error": "<reason>"}
-        """
-        try:
-            rmap = get_rmap_instance()
-        except Exception as e:
-            app.logger.error(f"RMAP initialization failed: {e}")
-            return jsonify({"error": "RMAP system initialization failed"}), 503
-
-        payload = request.get_json(silent=True) or {}
-        if "payload" not in payload:
-            return jsonify({"error": "payload is required"}), 400
-
-        try:
-            result = rmap.handle_message1(payload)
-            if "error" in result:
-                return jsonify(result), 400
-            return jsonify(result), 200
-        except Exception as e:
-            app.logger.error(f"RMAP Message 1 processing failed: {e}")
-            return jsonify({"error": "RMAP processing failed"}), 500
-
-    # POST /rmap-get-link - RMAP Message 2 Handler
-    @app.post("/rmap-get-link")
-    def rmap_get_link():
-        """
-        Handle RMAP Message 2: Final authentication step.
-
-        Expected payload: {"payload": "<base64-encoded-pgp-message>"}
-        The decrypted message should contain: {"nonceServer": <u64>}
-
-        Returns:
-        - On success: {"result": "<32-hex-chars>"}
-        - On error: {"error": "<reason>"}
-        """
-        try:
-            rmap = get_rmap_instance()
-        except Exception as e:
-            app.logger.error(f"RMAP initialization failed: {e}")
-            return jsonify({"error": "RMAP system initialization failed"}), 503
-
-        payload = request.get_json(silent=True) or {}
-        if "payload" not in payload:
-            return jsonify({"error": "payload is required"}), 400
-
-        try:
-            result = rmap.handle_message2(payload)
-            if "error" in result:
-                return jsonify(result), 400
-            return jsonify(result), 200
-        except Exception as e:
-            app.logger.error(f"RMAP Message 2 processing failed: {e}")
-            return jsonify({"error": "RMAP processing failed"}), 500
 
     return app
 
