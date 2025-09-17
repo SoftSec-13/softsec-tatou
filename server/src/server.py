@@ -371,21 +371,21 @@ def create_app():
                     {"did": document_id, "uid": int(g.user["id"])},
                 ).first()
 
-            if not doc:
-                return jsonify({"error": "document not found"}), 404
+                if not doc:
+                    return jsonify({"error": "document not found"}), 404
 
-            # Then fetch versions with ownership validation
-            rows = conn.execute(
-                text("""
-                    SELECT v.id, v.documentid, v.link, v.intended_for,
-                           v.secret, v.method
-                    FROM Documents d
-                    JOIN Versions v ON d.id = v.documentid
-                    WHERE d.id = :did AND d.ownerid = :uid
-                    ORDER BY v.id DESC
-                """),
-                {"did": document_id, "uid": int(g.user["id"])},
-            ).all()
+                # Then fetch versions with ownership validation
+                rows = conn.execute(
+                    text("""
+                        SELECT v.id, v.documentid, v.link, v.intended_for,
+                            v.secret, v.method
+                        FROM Documents d
+                        JOIN Versions v ON d.id = v.documentid
+                        WHERE d.id = :did AND d.ownerid = :uid
+                        ORDER BY v.id DESC
+                    """),
+                    {"did": document_id, "uid": int(g.user["id"])},
+                ).all()
         except Exception as e:
             # Log the full error for debugging
             app.logger.error(f"Database error in list_versions: {str(e)}")
