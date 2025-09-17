@@ -556,6 +556,7 @@ def create_app():
 
     # GET /api/get-version/<link>  → returns the watermarked PDF (inline)
     @app.get("/api/get-version/<link>")
+    @require_auth
     def get_version(link: str):
         # Expect SHA-256 style tokens to reduce brute-force signal and header abuse
         if not re.fullmatch(r"[0-9a-f]{64}", link):
@@ -654,10 +655,10 @@ def create_app():
                 ) from None
         return fp
 
-    # DELETE /api/delete-document  (and variants)
-    # @app.route("/api/delete-document", methods=["DELETE", "POST"])
-    # POST supported for convenience
-    # @app.route("/api/delete-document/<document_id>", methods=["DELETE"])
+    # DELETE /api/delete-document  (and variants) POST supported for convenience
+    @app.route("/api/delete-document", methods=["DELETE", "POST"])
+    @app.route("/api/delete-document/<document_id>", methods=["DELETE"])
+    @require_auth
     def delete_document(document_id: int | None = None):
         # accept id from path, query (?id= / ?documentid=), or JSON body on POST
         if not document_id:
