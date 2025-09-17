@@ -150,17 +150,26 @@
 
     document.getElementById('uploadForm').addEventListener('submit', async (e) => {
       e.preventDefault();
+      const form = e.currentTarget;
       statusEl.textContent = 'Uploading…';
-      const fd = new FormData(e.currentTarget);
+      const fd = new FormData(form);
       try {
         const resp = await apiFetch('/api/upload-document', { method: 'POST', body: fd });
-        if (!resp.ok) {
-          const err = await resp.json().catch(()=>({}));
-          throw new Error(err.message || resp.statusText);
+        if (resp.status >= 200 && resp.status < 300) {
+          statusEl.textContent = 'Uploaded successfully';
+          form.reset(); // Use stored reference instead of e.currentTarget
+          await loadDocuments();
+        } else {
+          let errorMessage = `HTTP ${resp.status}`;
+          try {
+            const errorData = await resp.json();
+            errorMessage = errorData.error || errorData.message || errorMessage;
+          } catch (parseError) {
+            // If we can't parse JSON, use status text
+            errorMessage = resp.statusText || errorMessage;
+          }
+          throw new Error(errorMessage);
         }
-        statusEl.textContent = 'Uploaded successfully';
-        e.currentTarget.reset();
-        await loadDocuments();
       } catch (err) {
         statusEl.textContent = 'Upload failed: ' + err.message;
       } finally {
