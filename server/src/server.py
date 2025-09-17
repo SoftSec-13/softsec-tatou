@@ -555,14 +555,18 @@ def create_app():
             return jsonify({"error": "error serving file"}), 500
 
     # GET /api/get-version/<link>  → returns the watermarked PDF (inline)
-    # @app.get("/api/get-version/<link>")
+    @app.get("/api/get-version/<link>")
     def get_version(link: str):
+        # Expect SHA-256 style tokens to reduce brute-force signal and header abuse
+        if not re.fullmatch(r"[0-9a-f]{64}", link):
+            return jsonify({"error": "document not found"}), 404
+
         try:
             with get_engine().connect() as conn:
                 row = conn.execute(
                     text(
                         """
-                        SELECT *
+                        SELECT path, link
                         FROM Versions
                         WHERE link = :link
                         LIMIT 1
@@ -571,38 +575,63 @@ def create_app():
                     {"link": link},
                 ).first()
         except Exception as e:
-            return jsonify({"error": f"database error: {str(e)}"}), 503
+            app.logger.error("Database error in get_version: %s", e)
+            return jsonify({"error": "database error"}), 503
 
-        # Don’t leak whether a doc exists for another user
         if not row:
             return jsonify({"error": "document not found"}), 404
 
-        file_path = Path(row.path)
-
-        # Basic safety: ensure path is inside STORAGE_DIR and exists
         try:
-            file_path.resolve().relative_to(app.config["STORAGE_DIR"].resolve())
-        except Exception:
-            # Path looks suspicious or outside storage
+            resolved = _safe_resolve_under_storage(row.path, app.config["STORAGE_DIR"])
+        except Exception as exc:
+            app.logger.warning(
+                "Rejected version path for link %s: %s (%s)", link, row.path, exc
+            )
             return jsonify({"error": "document path invalid"}), 500
 
-        if not file_path.exists():
+        if not resolved.exists():
             return jsonify({"error": "file missing on disk"}), 410
 
-        # Serve inline with caching hints + ETag based on stored sha256
-        resp = send_file(
-            file_path,
-            mimetype="application/pdf",
-            as_attachment=False,
-            download_name=row.link
-            if row.link.lower().endswith(".pdf")
-            else f"{row.link}.pdf",
-            conditional=True,  # enables 304 if If-Modified-Since/Range handling
-            max_age=0,
-            last_modified=file_path.stat().st_mtime,
+        try:
+            with resolved.open("rb") as fh:
+                header = fh.read(5)
+                if header != b"%PDF-":
+                    return jsonify({"error": "document not available"}), 415
+                fh.seek(0)
+                last_modified = os.fstat(fh.fileno()).st_mtime
+        except OSError:
+            return jsonify({"error": "file missing on disk"}), 410
+        except Exception as e:
+            app.logger.error("Error inspecting version file for %s: %s", link, e)
+            return jsonify({"error": "error serving file"}), 500
+
+        download_name = (
+            row.link if row.link.lower().endswith(".pdf") else f"{row.link}.pdf"
+        )
+        safe_download = download_name.replace("\r", "").replace("\n", "")
+
+        try:
+            resp = send_file(
+                resolved,
+                mimetype="application/pdf",
+                as_attachment=False,
+                download_name=safe_download,
+                conditional=True,
+                max_age=0,
+                last_modified=last_modified,
+            )
+        except Exception as e:
+            app.logger.error("Error serving version %s: %s", link, e)
+            return jsonify({"error": "error serving file"}), 500
+
+        resp.headers["Cache-Control"] = "private, max-age=0, must-revalidate"
+        resp.headers["Content-Type"] = "application/pdf"
+        resp.headers["Content-Disposition"] = f'inline; filename="{safe_download}"'
+        resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+        resp.headers.setdefault(
+            "Content-Security-Policy", "sandbox; default-src 'none'"
         )
 
-        resp.headers["Cache-Control"] = "private, max-age=0"
         return resp
 
     # Helper: resolve path safely under STORAGE_DIR (handles absolute/relative)
