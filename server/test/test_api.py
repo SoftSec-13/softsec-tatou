@@ -42,8 +42,16 @@ def test_create_user_route(client):
 
     # Note: This will likely fail due to database connectivity in tests
     # but we can test that the endpoint exists and handles the request
-    assert resp.status_code != 404  # Endpoint should exist
+    #basic tests
+    assert resp.status_code == 201  # Endpoint should exist
     assert resp.is_json
+    #check types
+    assert isinstance(resp.get("id"), int)
+    assert isinstance(resp.get("login"), str) 
+    assert isinstance(resp.get("email"), str)
+    #check values are what we submitted
+    assert resp.get("login") == parameters["login"]
+    assert resp.get("email") == parameters["email"]
 
 
 def test_login_route(client):
@@ -56,15 +64,38 @@ def test_login_route(client):
 
     # Note: This will likely fail due to database connectivity in tests
     # but we can test that the endpoint exists and handles the request
-    assert resp.status_code != 404  # Endpoint should exist
+    #basic tests
+    assert resp.status_code == 200
     assert resp.is_json
+    #check types
+    assert isinstance(resp.get("token"), str) 
+    assert isinstance(resp.get("token_type"), str)
+    assert isinstance(resp.get("expires_in"), int)
+    #check val
+    assert resp.get("token_type") == "bearer"
+
 
 
 def test_upload_document_route(client):
     """Test document upload endpoint."""
     # This endpoint might be commented out in the current server implementation
     # Let's test if it exists
-    resp = client.post("/api/upload-document", json={})
+    pdf_file = "" #TODO add dummy file for testing
+    parameters = {"file":pdf_file, "name":"My File"}
+    resp = client.post("/api/upload-document", json=parameters)
 
     # Should return 404 if route is commented out, or other error if route exists
-    assert resp.status_code in [404, 400, 405, 500]  # Various expected error codes
+    #assert resp.status_code in [404, 400, 405, 500]  # Various expected error codes
+
+    #tests when fully functional
+    #basic tests
+    assert resp.status_code == 200
+    assert resp.is_json
+    #check types
+    assert isinstance(resp.get("id"), str) 
+    assert isinstance(resp.get("name"), str) 
+    assert isinstance(resp.get("creation"), str) and datetime.fromisoformat(resp.get("creation"))
+    assert isinstance(resp.get("sha256"), str) 
+    assert isinstance(resp.get("size"), int) 
+    #check value
+    assert resp.get("name") == parameters["name"]
