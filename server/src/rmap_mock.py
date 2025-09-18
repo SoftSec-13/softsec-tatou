@@ -41,7 +41,12 @@ class MockIdentityManager:
 
     # For testing, we'll accept a hardcoded set of identities
     known_identities: dict[str, bool] = field(
-        default_factory=lambda: {"Jean": True, "Alice": True, "Bob": True}
+        default_factory=lambda: {
+            "Jean": True,
+            "Alice": True,
+            "Bob": True,
+            "Group_13": True,
+        }
     )
 
     def has_identity(self, identity: str) -> bool:
