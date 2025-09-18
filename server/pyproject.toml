@@ -11,7 +11,7 @@ dependencies = [
 	"SQLAlchemy>=2.0.43",
 	"dill>=0.4.0",
 	"cryptography>=3.4.0",
-	"rmap @ git+https://github.com/SoftSec-13/RMAP-Server.git@main"
+	"rmap @ git+https://github.com/nharrand/RMAP-Server.git@v1.0.0"
 ]
 
 [project.optional-dependencies]
