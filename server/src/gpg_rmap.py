@@ -130,9 +130,51 @@ class GPGRMAP:
             raise GPGRMAPError(f"Failed to encrypt message for {recipient_identity}: {e}")
             
     def _get_client_email(self, identity: str) -> str:
-        """Get client email from identity for GPG operations."""
-        # Map identity to email format
-        return f"{identity.lower()}@tatou.example.com"
+        """Get client email from identity by looking up in GPG keyring."""
+        try:
+            # Try to find the key by searching for the identity in the keyring
+            result = subprocess.run([
+                'gpg', '--list-keys', '--with-colons'
+            ], capture_output=True, text=True, check=True)
+            
+            # Parse the output to find keys that match the identity
+            lines = result.stdout.split('\n')
+            for line in lines:
+                if line.startswith('uid:') and identity.lower() in line.lower():
+                    # Extract email from uid line (format: uid:...:...:...:...:Name <email>:...)
+                    parts = line.split(':')
+                    if len(parts) >= 10:
+                        user_id = parts[9]  # The user ID field
+                        # Extract email using regex
+                        import re
+                        email_match = re.search(r'<([^>]+)>', user_id)
+                        if email_match:
+                            return email_match.group(1)
+            
+            # Fallback: try different identity formats
+            fallback_patterns = [
+                f"group{identity.lower().replace('group', '').replace('_', '')}",
+                f"group_{identity.lower().replace('group', '').replace('_', '')}",
+                identity.lower()
+            ]
+            
+            for pattern in fallback_patterns:
+                for line in lines:
+                    if line.startswith('uid:') and pattern in line.lower():
+                        parts = line.split(':')
+                        if len(parts) >= 10:
+                            user_id = parts[9]
+                            import re
+                            email_match = re.search(r'<([^>]+)>', user_id)
+                            if email_match:
+                                return email_match.group(1)
+            
+            # Final fallback to original format for compatibility
+            return f"{identity.lower()}@tatou.example.com"
+            
+        except subprocess.CalledProcessError:
+            # If GPG fails, use fallback
+            return f"{identity.lower()}@tatou.example.com"
         
     def handle_message1(self, incoming: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -168,9 +210,21 @@ class GPGRMAP:
                 return {"error": "Invalid identity"}
                 
             client_email = self._get_client_email(identity)
-            client_key_file = Path(self.client_keys_dir) / f"{identity}.asc"
             
-            if not client_key_file.exists():
+            # Try multiple possible key file names
+            possible_key_files = [
+                Path(self.client_keys_dir) / f"{identity}.asc",
+                Path(self.client_keys_dir) / f"Group_{identity.replace('Group', '').replace('group', '')}.asc",
+                Path(self.client_keys_dir) / f"Group{identity.replace('Group', '').replace('group', '')}.asc",
+            ]
+            
+            client_key_file = None
+            for key_file in possible_key_files:
+                if key_file.exists():
+                    client_key_file = key_file
+                    break
+            
+            if not client_key_file:
                 return {"error": f"Unknown identity: {identity}"}
             
             # Generate server nonce

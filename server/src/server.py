@@ -39,7 +39,7 @@ def create_app():
         storage_dir=str(app.config["STORAGE_DIR"]),
         server_public_key_path="../server_pub.asc",
         server_private_key_path="../server_priv.asc", 
-        client_keys_dir="../public-keys/pki",
+        client_keys_dir="client_keys/pki",
         server_private_key_passphrase=None
     )
 
