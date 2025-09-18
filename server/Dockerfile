@@ -22,10 +22,12 @@ RUN if [ -n "$GITHUB_TOKEN" ]; then \
 # Copy sources after dependencies installation
 COPY src /app/src
 COPY flag /app/flag
+
 # Copy PGP keys for RMAP authentication
-COPY server_priv.asc /app/server_priv.asc
-COPY server_pub.asc /app/server_pub.asc
-COPY public-keys /app/public-keys
+COPY src/server_priv.asc /app/server_priv.asc
+COPY src/server_pub.asc /app/server_pub.asc
+COPY src/public-keys/ /app/public-keys/
+
 RUN pip install --no-cache-dir -e .
 
 EXPOSE 5000
