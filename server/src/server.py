@@ -13,6 +13,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
 import watermarking_utils as WMUtils
+from simple_rmap import SimpleRMAP
 
 
 def create_app():
@@ -32,6 +33,9 @@ def create_app():
     app.config["DB_NAME"] = os.environ.get("DB_NAME", "tatou")
 
     app.config["STORAGE_DIR"].mkdir(parents=True, exist_ok=True)
+
+    # --- RMAP initialization ---
+    rmap_instance = SimpleRMAP(str(app.config["STORAGE_DIR"]))
 
     # --- DB engine only (no Table metadata) ---
     def db_url() -> str:
@@ -863,6 +867,37 @@ def create_app():
                 "position": position,
             }
         ), 201
+
+    # RMAP Routes
+    @app.post("/rmap-initiate")
+    def rmap_initiate():
+        """Handle RMAP message 1 (initiate authentication)."""
+        try:
+            payload = request.get_json(silent=True) or {}
+            result = rmap_instance.handle_message1(payload)
+            
+            if "error" in result:
+                return jsonify(result), 400 if "required" in result["error"] else 503
+            
+            return jsonify(result), 200
+            
+        except Exception as e:
+            return jsonify({"error": f"RMAP system initialization failed: {str(e)}"}), 503
+    
+    @app.post("/rmap-get-link")
+    def rmap_get_link():
+        """Handle RMAP message 2 (get session link)."""
+        try:
+            payload = request.get_json(silent=True) or {}
+            result = rmap_instance.handle_message2(payload)
+            
+            if "error" in result:
+                return jsonify(result), 400 if "required" in result["error"] else 503
+            
+            return jsonify(result), 200
+            
+        except Exception as e:
+            return jsonify({"error": f"RMAP system initialization failed: {str(e)}"}), 503
 
     return app
 
