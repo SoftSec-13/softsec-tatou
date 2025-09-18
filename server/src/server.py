@@ -13,7 +13,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
 import watermarking_utils as WMUtils
-from simple_rmap import SimpleRMAP
+from gpg_rmap import GPGRMAP
 
 
 def create_app():
@@ -35,7 +35,13 @@ def create_app():
     app.config["STORAGE_DIR"].mkdir(parents=True, exist_ok=True)
 
     # --- RMAP initialization ---
-    rmap_instance = SimpleRMAP(str(app.config["STORAGE_DIR"]))
+    rmap_instance = GPGRMAP(
+        storage_dir=str(app.config["STORAGE_DIR"]),
+        server_public_key_path="../server_pub.asc",
+        server_private_key_path="../server_priv.asc", 
+        client_keys_dir="../public-keys/pki",
+        server_private_key_passphrase=None
+    )
 
     # --- DB engine only (no Table metadata) ---
     def db_url() -> str:
