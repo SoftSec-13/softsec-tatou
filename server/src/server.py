@@ -875,29 +875,33 @@ def create_app():
         try:
             payload = request.get_json(silent=True) or {}
             result = rmap_instance.handle_message1(payload)
-            
+
             if "error" in result:
                 return jsonify(result), 400 if "required" in result["error"] else 503
-            
+
             return jsonify(result), 200
-            
+
         except Exception as e:
-            return jsonify({"error": f"RMAP system initialization failed: {str(e)}"}), 503
-    
+            return jsonify(
+                {"error": f"RMAP system initialization failed: {str(e)}"}
+            ), 503
+
     @app.post("/rmap-get-link")
     def rmap_get_link():
         """Handle RMAP message 2 (get session link)."""
         try:
             payload = request.get_json(silent=True) or {}
             result = rmap_instance.handle_message2(payload)
-            
+
             if "error" in result:
                 return jsonify(result), 400 if "required" in result["error"] else 503
-            
+
             return jsonify(result), 200
-            
+
         except Exception as e:
-            return jsonify({"error": f"RMAP system initialization failed: {str(e)}"}), 503
+            return jsonify(
+                {"error": f"RMAP system initialization failed: {str(e)}"}
+            ), 503
 
     return app
 
