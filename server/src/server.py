@@ -12,14 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
-# try:
-#     import dill as _pickle  # allows loading classes not importable by module path
-# except Exception:  # dill is optional
-#     _pickle = _std_pickle
 import watermarking_utils as WMUtils
-
-# from watermarking_utils import METHODS, apply_watermark, read_watermark, explore_pdf,
-# \is_watermarking_applicable, get_method
 
 
 def create_app():
@@ -756,8 +749,8 @@ def create_app():
 
     # POST /api/create-watermark or /api/create-watermark/<id>
     # → create watermarked pdf and returns metadata
-    # @app.post("/api/create-watermark")
-    # @app.post("/api/create-watermark/<int:document_id>")
+    @app.post("/api/create-watermark")
+    @app.post("/api/create-watermark/<int:document_id>")
     @require_auth
     def create_watermark(document_id: int | None = None):
         # accept id from path, query (?id= / ?documentid=), or JSON body on GET
@@ -805,14 +798,15 @@ def create_app():
                         """
                         SELECT id, name, path
                         FROM Documents
-                        WHERE id = :id
+                        WHERE id = :id AND ownerid = :owner
                         LIMIT 1
                     """
                     ),
-                    {"id": doc_id},
+                    {"id": doc_id, "owner": int(g.user["id"])},
                 ).first()
         except Exception as e:
-            return jsonify({"error": f"database error: {str(e)}"}), 503
+            app.logger.exception("Database error fetching document %s", e)
+            return jsonify({"error": "database error"}), 503
 
         if not row:
             return jsonify({"error": "document not found"}), 404
@@ -838,7 +832,10 @@ def create_app():
             if applicable is False:
                 return jsonify({"error": "watermarking method not applicable"}), 400
         except Exception as e:
-            return jsonify({"error": f"watermark applicability check failed: {e}"}), 400
+            app.logger.exception(
+                "Watermark applicability check failed for document %s", e
+            )
+            return jsonify({"error": "watermark applicability check failed"}), 400
 
         # apply watermark → bytes
         try:
@@ -852,7 +849,13 @@ def create_app():
             if not isinstance(wm_bytes, bytes | bytearray) or len(wm_bytes) == 0:
                 return jsonify({"error": "watermarking produced no output"}), 500
         except Exception as e:
-            return jsonify({"error": f"watermarking failed: {e}"}), 500
+            app.logger.exception(
+                "Watermarking failed for document %s using method %s: %s",
+                doc_id,
+                method,
+                e,
+            )
+            return jsonify({"error": "watermarking failed"}), 500
 
         # build destination file name: "<original_name>__<intended_to>.pdf"
         base_name = Path(row.name or file_path.name).stem
@@ -868,7 +871,13 @@ def create_app():
             with dest_path.open("wb") as f:
                 f.write(wm_bytes)
         except Exception as e:
-            return jsonify({"error": f"failed to write watermarked file: {e}"}), 500
+            app.logger.exception(
+                "Failed to write watermarked file %s for document %s: %s",
+                dest_path,
+                doc_id,
+                e,
+            )
+            return jsonify({"error": "failed to write watermarked file"}), 500
 
         # link token = sha256(watermarked_file_name) - using stronger hash
         link_token = hashlib.sha256(candidate.encode("utf-8")).hexdigest()
@@ -891,11 +900,11 @@ def create_app():
                         "secret": secret,
                         "method": method,
                         "position": position or "",
-                        "path": dest_path,
+                        "path": str(dest_path),
                     },
                 )
                 vid = int(conn.execute(text("SELECT LAST_INSERT_ID()")).scalar())
-        except Exception as e:
+        except Exception:
             # best-effort cleanup if DB insert fails
             try:
                 dest_path.unlink(missing_ok=True)
@@ -904,7 +913,10 @@ def create_app():
                 app.logger.warning(
                     f"Failed to cleanup file {dest_path}: {cleanup_error}"
                 )
-            return jsonify({"error": f"database error during version insert: {e}"}), 503
+            app.logger.exception(
+                "Database error during version insert for document %s", doc_id
+            )
+            return jsonify({"error": "database error during version insert"}), 503
 
         return jsonify(
             {
@@ -918,85 +930,6 @@ def create_app():
                 "size": len(wm_bytes),
             }
         ), 201
-
-    # @app.post("/api/load-plugin")
-    # @require_auth
-    # def load_plugin():
-    #     """
-    #     Load a serialized Python class implementing WatermarkingMethod from
-    #     STORAGE_DIR/files/plugins/<filename>.{pkl|dill} and register it in
-    # \wm_mod.METHODS.
-    #     Body: { "filename": "MyMethod.pkl", "overwrite": false }
-    #     """
-    #     payload = request.get_json(silent=True) or {}
-    #     filename = (payload.get("filename") or "").strip()
-    #     overwrite = bool(payload.get("overwrite", False))
-
-    #     if not filename:
-    #         return jsonify({"error": "filename is required"}), 400
-
-    #     # Locate the plugin in /storage/files/plugins (relative to STORAGE_DIR)
-    #     storage_root = Path(app.config["STORAGE_DIR"])
-    #     plugins_dir = storage_root / "files" / "plugins"
-    #     try:
-    #         plugins_dir.mkdir(parents=True, exist_ok=True)
-    #         plugin_path = plugins_dir / filename
-    #     except Exception as e:
-    #         return jsonify({"error": f"plugin path error: {e}"}), 500
-
-    #     if not plugin_path.exists():
-    #         return jsonify({"error": f"plugin file not found: {filename}"}), 404
-
-    #     # Unpickle the object (dill if available; else std pickle)
-    #     try:
-    #         with plugin_path.open("rb") as f:
-    #             obj = _pickle.load(f)
-    #     except Exception as e:
-    #         return jsonify({"error": f"failed to deserialize plugin: {e}"}), 400
-
-    #     # Accept: class object, or instance (we'll promote instance to its class)
-    #     if isinstance(obj, type):
-    #         cls = obj
-    #     else:
-    #         cls = obj.__class__
-
-    #     # Determine method name for registry
-    #     method_name = getattr(cls, "name", getattr(cls, "__name__", None))
-    #     if not method_name or not isinstance(method_name, str):
-    #         return jsonify(
-    #             {
-    #                 "error": "plugin class must define a readable name \
-    # (class.__name__ or .name)"
-    #             }
-    #         ), 400
-
-    #     # Validate interface: either subclass of WatermarkingMethod or duck-typing
-    #     has_api = all(hasattr(cls, attr) for attr in ("add_watermark", "read_secret"))
-    #     if WatermarkingMethod is not None:
-    #         is_ok = issubclass(cls, WatermarkingMethod) and has_api
-    #     else:
-    #         is_ok = has_api
-    #     if not is_ok:
-    #         return jsonify(
-    #             {
-    #                 "error": "plugin does not implement WatermarkingMethod API
-    # \(add_watermark/read_secret)"
-    #             }
-    #         ), 400
-
-    #     # Register the class (not an instance) so you can instantiate as needed later
-    #     WMUtils.METHODS[method_name] = cls()
-
-    #     return jsonify(
-    #         {
-    #             "loaded": True,
-    #             "filename": filename,
-    #             "registered_as": method_name,
-    #             "class_qualname": f"{getattr(cls, '__module__', '?')}
-    # \.{getattr(cls, '__qualname__', cls.__name__)}",
-    #             "methods_count": len(WMUtils.METHODS),
-    #         }
-    #     ), 201
 
     # GET /api/get-watermarking-methods
     # → {"methods":[{"name":..., "description":...}, ...], "count":N}
@@ -1012,8 +945,8 @@ def create_app():
         return jsonify({"methods": methods, "count": len(methods)}), 200
 
     # POST /api/read-watermark
-    # @app.post("/api/read-watermark")
-    # @app.post("/api/read-watermark/<int:document_id>")
+    @app.post("/api/read-watermark")
+    @app.post("/api/read-watermark/<int:document_id>")
     @require_auth
     def read_watermark(document_id: int | None = None):
         # accept id from path, query (?id= / ?documentid=), or JSON body on POST
@@ -1041,10 +974,10 @@ def create_app():
             doc_id = int(doc_id)
         except (TypeError, ValueError):
             return jsonify({"error": "document_id (int) is required"}), 400
-        if not method or not isinstance(key, str):
+        if not method or not isinstance(method, str) or not isinstance(key, str):
             return jsonify({"error": "method, and key are required"}), 400
 
-        # lookup the document; FIXME enforce ownership
+        # lookup the document; enforce ownership
         try:
             with get_engine().connect() as conn:
                 row = conn.execute(
@@ -1052,13 +985,17 @@ def create_app():
                         """
                         SELECT id, name, path
                         FROM Documents
-                        WHERE id = :id
+                        WHERE id = :id AND ownerid = :owner
+                        LIMIT 1
                     """
                     ),
-                    {"id": doc_id},
+                    {"id": doc_id, "owner": int(g.user["id"])},
                 ).first()
         except Exception as e:
-            return jsonify({"error": f"database error: {str(e)}"}), 503
+            app.logger.exception(
+                "Database error fetching document %s for watermark read: %s", doc_id, e
+            )
+            return jsonify({"error": "database error"}), 503
 
         if not row:
             return jsonify({"error": "document not found"}), 404
@@ -1080,9 +1017,10 @@ def create_app():
         try:
             secret = WMUtils.read_watermark(method=method, pdf=str(file_path), key=key)
         except Exception as e:
-            return jsonify(
-                {"error": f"Error when attempting to read watermark: {e}"}
-            ), 400
+            app.logger.exception(
+                "Error when attempting to read watermark for document %s: %s", doc_id, e
+            )
+            return jsonify({"error": "error when attempting to read watermark"}), 400
         return jsonify(
             {
                 "documentid": doc_id,
