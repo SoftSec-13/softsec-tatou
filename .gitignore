@@ -6,6 +6,11 @@ __pycache__/
 # C extensions
 *.so
 
+# Keys
+server/server_priv.asc
+server/server_pub.asc
+
+
 # Distribution / packaging
 .Python
 build/
