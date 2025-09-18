@@ -10,6 +10,7 @@ WORKDIR /app
 COPY pyproject.toml /app/pyproject.toml
 
 # Install runtime dependencies
+RUN apt-get update && apt-get install -y gpg
 RUN pip install --no-cache-dir -e .
 
 # Copy sources after dependencies installation
