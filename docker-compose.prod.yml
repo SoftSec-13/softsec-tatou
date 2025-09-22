@@ -79,7 +79,7 @@ services:
     command: [ "-verbose", "-hooks=/etc/webhook/hooks.json", "-hotreload" ]
     volumes:
       - /home/lab/softsec-tatou/webhook/hooks.json:/etc/webhook/hooks.json:ro
-      - /home/lab/softsec-tatou/sync_repo_and_reload.sh:/opt/app/sync_repo_and_reload.sh:ro
+      - /home/lab/sync_repo_and_reload.sh:/opt/app/sync_repo_and_reload.sh:ro
     restart: unless-stopped
   # watchtower: updates images and calls our local webhook afterward
   watchtower:

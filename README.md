@@ -63,8 +63,14 @@ http -v :5000/healthz
 
 ### Deploy on production (VM)
 ```bash
+cd softsec-tatou
+
 # Create .env and fill with secrets
 vim .env
+
+# Copy script and make it executable
+cp sync_repo_and_reload.sh /home/lab/.
+chmod +x /home/lab/sync_repo_and_reload.sh
 
 # Deploy the containers
 docker compose -f docker-compose.prod.yml up -d
