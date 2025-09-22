@@ -2,6 +2,24 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Embed",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "server/src/watermarking_cli.py",
+            "console": "integratedTerminal",
+            "args": "embed --method signed-annots --secret aaa --key bbb cat.pdf cat1.pdf",
+            "justMyCode": false
+        },
+        {
+            "name": "Extract",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "server/src/watermarking_cli.py",
+            "console": "integratedTerminal",
+            "args": "extract --method signed-annots --key bbb cat1.pdf",
+            "justMyCode": false
+        },
+        {
             "name": "Python Debugger: Remote Attach",
             "type": "debugpy",
             "request": "attach",
@@ -14,7 +32,8 @@
                     "localRoot": "${workspaceFolder}",
                     "remoteRoot": "."
                 }
-            ]
+            ],
+            "justMyCode": false
         }
     ]
 }
