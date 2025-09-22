@@ -84,8 +84,8 @@ services:
       - WATCHTOWER_ROLLING_RESTART=true
       # notify our internal webhook after updates:
       - WATCHTOWER_NOTIFICATION_URL=generic+http://172.18.0.1:9000/hooks/repo-sync
-      - DOCKERHUB_USER=${DOCKERHUB_USER}
-      - DOCKERHUB_PASSWORD=${DOCKERHUB_PASSWORD}
+      - REPO_USER=${DOCKERHUB_USER}
+      - REPO_PASS=${DOCKERHUB_PASSWORD}
     command: --interval 300
 
 volumes:
