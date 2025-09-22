@@ -2,9 +2,7 @@ version: "3.9"
 
 services:
   server:
-    build:
-      context: server
-      dockerfile: Dockerfile
+    image: ${DOCKERHUB_USER}/tatou:latest
     ports:
       - "5000:5000"
     volumes:
@@ -21,9 +19,11 @@ services:
       db:
         condition: service_healthy
     restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
 
   db:
-    image: mariadb:11.4
+    image: mariadb:latest
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     environment:
       - MARIADB_ROOT_PASSWORD=${MARIADB_ROOT_PASSWORD}
@@ -44,7 +44,7 @@ services:
 
   # Monitoring
   loki:
-    image: grafana/loki:2.9.0
+    image: grafana/loki:latest
     container_name: loki
     command: -config.file=/etc/loki/local-config.yaml
     ports:
@@ -52,7 +52,7 @@ services:
     restart: unless-stopped
 
   promtail:
-    image: grafana/promtail:2.9.0
+    image: grafana/promtail:latest
     container_name: promtail
     volumes:
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
@@ -71,6 +71,19 @@ services:
       - ./grafana/provisioning:/etc/grafana/provisioning
       - ./grafana/provisioning/dashboards:/var/lib/grafana/dashboards
     restart: unless-stopped
+
+  watchtower:
+    image: containrrr/watchtower:latest
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_LABEL_ENABLE=true
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_ROLLING_RESTART=true
+      - REPO_USER=${DOCKERHUB_USER}
+      - REPO_PASS=${DOCKERHUB_PASSWORD}
+    command: --interval 300
 
 volumes:
   db-data:
