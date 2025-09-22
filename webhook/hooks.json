@@ -1,7 +1,0 @@
-[
-  {
-    "id": "repo-sync",
-    "execute-command": "/home/lab/sync_repo_and_reload.sh",
-    "command-working-directory": "/home/lab/softsec-tatou"
-  }
-]
