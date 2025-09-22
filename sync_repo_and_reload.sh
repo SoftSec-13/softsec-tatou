@@ -11,7 +11,7 @@ flock -n 9 || exit 0
 
 prev=$(git rev-parse HEAD)
 git fetch --all --prune
-git reset --hard origin/21-automate-deployment # TODO change to origin/main
+git reset --hard origin/main
 new=$(git rev-parse HEAD)
 
 # nothing changed → exit
