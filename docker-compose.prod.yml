@@ -2,7 +2,7 @@ version: "3.9"
 
 services:
   server:
-    image: ${DOCKERHUB_USER}/tatou:21-automate-deployment
+    image: ${DOCKERHUB_USER}/tatou:latest
     ports:
       - "5000:5000"
     volumes:
@@ -82,8 +82,6 @@ services:
       - WATCHTOWER_LABEL_ENABLE=true
       - WATCHTOWER_CLEANUP=true
       - WATCHTOWER_ROLLING_RESTART=true
-      # notify our internal webhook after updates:
-      - WATCHTOWER_NOTIFICATION_URL=generic+http://172.18.0.1:9000/hooks/repo-sync
       - REPO_USER=${DOCKERHUB_USER}
       - REPO_PASS=${DOCKERHUB_PASSWORD}
     command: --interval 300
