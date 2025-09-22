@@ -13,7 +13,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
 import watermarking_utils as WMUtils
-from simple_rmap import SimpleRMAP
+from rmap_handler import RMAPHandler
 
 
 def create_app():
@@ -34,15 +34,6 @@ def create_app():
 
     app.config["STORAGE_DIR"].mkdir(parents=True, exist_ok=True)
 
-    # --- RMAP initialization ---
-    public_keys_dir = str(Path(__file__).parent.parent / "public-keys" / "pki")
-    server_private_key = str(Path(__file__).parent / "server_priv.asc")
-    rmap_instance = SimpleRMAP(
-        str(app.config["STORAGE_DIR"]),
-        public_keys_dir=public_keys_dir,
-        server_private_key=server_private_key,
-    )
-
     # --- DB engine only (no Table metadata) ---
     def db_url() -> str:
         return (
@@ -56,6 +47,9 @@ def create_app():
             eng = create_engine(db_url(), pool_pre_ping=True, future=True)
             app.config["_ENGINE"] = eng
         return eng
+
+    # --- RMAP initialization ---
+    rmap_handler = RMAPHandler(app, str(app.config["STORAGE_DIR"]), get_engine)
 
     # --- Helpers ---
     def _serializer():
@@ -1038,162 +1032,6 @@ def create_app():
                 "position": position,
             }
         ), 201
-
-    # RMAP Routes
-    @app.post("/rmap-initiate")
-    def rmap_initiate():
-        """Handle RMAP message 1 (initiate authentication)."""
-        try:
-            payload = request.get_json(silent=True) or {}
-            result = rmap_instance.handle_message1(payload)
-
-            if "error" in result:
-                return jsonify(result), 400 if "required" in result["error"] else 503
-
-            return jsonify(result), 200
-
-        except Exception as e:
-            return jsonify(
-                {"error": f"RMAP system initialization failed: {str(e)}"}
-            ), 503
-
-    @app.post("/rmap-get-link")
-    def rmap_get_link():
-        """Handle RMAP message 2 (get session link)."""
-        try:
-            payload = request.get_json(silent=True) or {}
-            result = rmap_instance.handle_message2(payload)
-
-            if "error" in result:
-                return jsonify(result), 400 if "required" in result["error"] else 503
-
-            # If RMAP authentication succeeded, create watermarked PDF
-            if "result" in result:
-                session_secret = result["result"]
-
-                # Get a sample PDF to watermark (we need to have at least one PDF in the system)
-                # For now, let's find the most recent PDF in the database
-                try:
-                    with get_engine().connect() as conn:
-                        # Find the most recent document to watermark
-                        doc_row = conn.execute(
-                            text(
-                                """
-                                SELECT id, name, path FROM Documents
-                                ORDER BY creation DESC
-                                LIMIT 1
-                            """
-                            )
-                        ).first()
-
-                        if not doc_row:
-                            return jsonify(
-                                {"error": "No documents available to watermark"}
-                            ), 500
-
-                        # Check if we already created a watermarked version for this session
-                        existing_version = conn.execute(
-                            text(
-                                """
-                                SELECT id, link FROM Versions
-                                WHERE link = :link LIMIT 1
-                            """
-                            ),
-                            {"link": session_secret},
-                        ).first()
-
-                        if existing_version:
-                            # Already created, just return the existing link
-                            return jsonify({"result": session_secret}), 200
-
-                except Exception as e:
-                    return jsonify({"error": f"Database error: {str(e)}"}), 500
-
-                # Create watermarked PDF
-                try:
-                    # Resolve file path
-                    storage_root = Path(app.config["STORAGE_DIR"]).resolve()
-                    file_path = Path(doc_row.path)
-                    if not file_path.is_absolute():
-                        file_path = storage_root / file_path
-                    file_path = file_path.resolve()
-
-                    if not file_path.exists():
-                        return jsonify({"error": "Source PDF not found"}), 500
-
-                    # Use robust-xmp watermarking (your best technique)
-                    method = "robust-xmp"
-                    secret = session_secret  # Use session secret as watermark
-                    key = "rmap-watermark-key"  # Fixed key for RMAP watermarks
-
-                    # Check if watermarking is applicable
-                    applicable = WMUtils.is_watermarking_applicable(
-                        method=method, pdf=str(file_path), position=None
-                    )
-                    if not applicable:
-                        return jsonify(
-                            {"error": "Watermarking not applicable to PDF"}
-                        ), 500
-
-                    # Apply watermark
-                    wm_bytes = WMUtils.apply_watermark(
-                        pdf=str(file_path),
-                        secret=secret,
-                        key=key,
-                        method=method,
-                        position=None,
-                    )
-
-                    if (
-                        not isinstance(wm_bytes, (bytes, bytearray))
-                        or len(wm_bytes) == 0
-                    ):
-                        return jsonify(
-                            {"error": "Watermarking produced no output"}
-                        ), 500
-
-                    # Create destination directory and file
-                    rmap_dir = storage_root / "rmap_watermarks"
-                    rmap_dir.mkdir(parents=True, exist_ok=True)
-
-                    dest_filename = f"rmap_{session_secret}.pdf"
-                    dest_path = rmap_dir / dest_filename
-
-                    # Write watermarked PDF
-                    with dest_path.open("wb") as f:
-                        f.write(wm_bytes)
-
-                    # Store in database
-                    with get_engine().begin() as conn:
-                        conn.execute(
-                            text(
-                                """
-                                INSERT INTO Versions (documentid, link, intended_for,
-                                                    secret, method, position, path)
-                                VALUES (:documentid, :link, :intended_for, :secret,
-                                       :method, :position, :path)
-                            """
-                            ),
-                            {
-                                "documentid": doc_row.id,
-                                "link": session_secret,
-                                "intended_for": "RMAP_CLIENT",
-                                "secret": secret,
-                                "method": method,
-                                "position": "",
-                                "path": str(dest_path),
-                            },
-                        )
-
-                except Exception as e:
-                    return jsonify(
-                        {"error": f"Failed to create watermarked PDF: {str(e)}"}
-                    ), 500
-
-            return jsonify(result), 200
-
-        except Exception as e:
-            return jsonify({"error": f"RMAP system error: {str(e)}"}), 503
 
     return app
 
