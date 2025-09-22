@@ -21,7 +21,7 @@ SERVER_URL = "http://localhost:5000"
 
 def load_server_public_key():
     """Load the server's public key."""
-    server_pub_path = Path("server/src/server_pub.asc")
+    server_pub_path = Path("src/server_pub.asc")
     if not server_pub_path.exists():
         raise FileNotFoundError(f"Server public key not found: {server_pub_path}")
     
@@ -31,7 +31,7 @@ def load_server_public_key():
 
 def load_group13_private_key():
     """Load Group 13's private key with password if needed."""
-    group13_priv_path = Path("private_key_group_13.asc")
+    group13_priv_path = Path("../private_key_group_13.asc")
     if not group13_priv_path.exists():
         raise FileNotFoundError(f"Group 13 private key not found: {group13_priv_path}")
     
