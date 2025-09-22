@@ -75,8 +75,13 @@ services:
   # local-only webhook listener (no exposed ports)
   repo-webhook:
     image: almir/webhook:latest
-    command: [ "-verbose", "-hooks=/etc/webhook/hooks.json", "-hotreload" ]
+    command: sh -c "apk add --no-cache bash git docker-cli docker-cli-compose && webhook -verbose -hooks=/etc/webhook/hooks.json -hotreload"
     volumes:
+      # Mount your repo so the script and files exist in the container
+      - /home/lab/softsec-tatou:/workspace
+      # Mount the Docker socket so 'docker compose' can control the host Docker
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Hooks + script paths inside the container
       - /home/lab/softsec-tatou/webhook/hooks.json:/etc/webhook/hooks.json:ro
       - /home/lab/sync_repo_and_reload.sh:/opt/app/sync_repo_and_reload.sh:ro
     restart: unless-stopped
@@ -91,7 +96,7 @@ services:
       - WATCHTOWER_CLEANUP=true
       - WATCHTOWER_ROLLING_RESTART=true
       # notify our internal webhook after updates:
-      - WATCHTOWER_NOTIFICATION_URL=http://repo-webhook:9000/hooks/repo-sync
+      - WATCHTOWER_NOTIFICATION_URL=generic+http://repo-webhook:9000/hooks/repo-sync
       - DOCKERHUB_USER=${DOCKERHUB_USER}
       - DOCKERHUB_PASSWORD=${DOCKERHUB_PASSWORD}
 
