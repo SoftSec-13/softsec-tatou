@@ -2,7 +2,7 @@ version: "3.9"
 
 services:
   server:
-    image: ${DOCKERHUB_USER}/tatou:latest
+    image: ${DOCKERHUB_USER}/tatou:21-automate-deployment
     ports:
       - "5000:5000"
     volumes:
@@ -74,7 +74,7 @@ services:
 
   # local-only webhook listener (no exposed ports)
   watchtower:
-    image: containrrr/watchtower:21-automate-deployment
+    image: containrrr/watchtower:latest
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
