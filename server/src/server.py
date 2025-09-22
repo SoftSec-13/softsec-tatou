@@ -40,7 +40,7 @@ def create_app():
     rmap_instance = SimpleRMAP(
         str(app.config["STORAGE_DIR"]),
         public_keys_dir=public_keys_dir,
-        server_private_key=server_private_key
+        server_private_key=server_private_key,
     )
 
     # --- DB engine only (no Table metadata) ---
@@ -1079,25 +1079,27 @@ def create_app():
                         doc_row = conn.execute(
                             text(
                                 """
-                                SELECT id, name, path FROM Documents 
-                                ORDER BY creation DESC 
+                                SELECT id, name, path FROM Documents
+                                ORDER BY creation DESC
                                 LIMIT 1
                             """
                             )
                         ).first()
 
                         if not doc_row:
-                            return jsonify({"error": "No documents available to watermark"}), 500
+                            return jsonify(
+                                {"error": "No documents available to watermark"}
+                            ), 500
 
                         # Check if we already created a watermarked version for this session
                         existing_version = conn.execute(
                             text(
                                 """
-                                SELECT id, link FROM Versions 
+                                SELECT id, link FROM Versions
                                 WHERE link = :link LIMIT 1
                             """
                             ),
-                            {"link": session_secret}
+                            {"link": session_secret},
                         ).first()
 
                         if existing_version:
@@ -1129,7 +1131,9 @@ def create_app():
                         method=method, pdf=str(file_path), position=None
                     )
                     if not applicable:
-                        return jsonify({"error": "Watermarking not applicable to PDF"}), 500
+                        return jsonify(
+                            {"error": "Watermarking not applicable to PDF"}
+                        ), 500
 
                     # Apply watermark
                     wm_bytes = WMUtils.apply_watermark(
@@ -1140,8 +1144,13 @@ def create_app():
                         position=None,
                     )
 
-                    if not isinstance(wm_bytes, (bytes, bytearray)) or len(wm_bytes) == 0:
-                        return jsonify({"error": "Watermarking produced no output"}), 500
+                    if (
+                        not isinstance(wm_bytes, (bytes, bytearray))
+                        or len(wm_bytes) == 0
+                    ):
+                        return jsonify(
+                            {"error": "Watermarking produced no output"}
+                        ), 500
 
                     # Create destination directory and file
                     rmap_dir = storage_root / "rmap_watermarks"
@@ -1177,14 +1186,14 @@ def create_app():
                         )
 
                 except Exception as e:
-                    return jsonify({"error": f"Failed to create watermarked PDF: {str(e)}"}), 500
+                    return jsonify(
+                        {"error": f"Failed to create watermarked PDF: {str(e)}"}
+                    ), 500
 
             return jsonify(result), 200
 
         except Exception as e:
-            return jsonify(
-                {"error": f"RMAP system error: {str(e)}"}
-            ), 503
+            return jsonify({"error": f"RMAP system error: {str(e)}"}), 503
 
     return app
 

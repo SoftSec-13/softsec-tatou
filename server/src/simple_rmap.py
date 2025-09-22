@@ -4,7 +4,6 @@ RMAP (Roger Michael Authentication Protocol) implementation for Tatou.
 Uses the proper RMAP library for cryptographic authentication between clients and server.
 """
 
-import base64
 from pathlib import Path
 from typing import Any
 
@@ -15,9 +14,16 @@ from rmap.rmap import RMAP
 class SimpleRMAP:
     """RMAP implementation using the proper RMAP library."""
 
-    def __init__(self, storage_dir: str, public_keys_dir: str = None, server_private_key: str = None):
+    def __init__(
+        self,
+        storage_dir: str,
+        public_keys_dir: str = None,
+        server_private_key: str = None,
+    ):
         self.storage_dir = storage_dir
-        self.watermarked_pdfs: dict[str, dict[str, Any]] = {}  # Store metadata about watermarked PDFs
+        self.watermarked_pdfs: dict[
+            str, dict[str, Any]
+        ] = {}  # Store metadata about watermarked PDFs
 
         # Set up paths for keys
         if public_keys_dir is None:
@@ -36,7 +42,7 @@ class SimpleRMAP:
         self.identity_manager = IdentityManager(
             client_keys_dir=public_keys_dir,
             server_public_key_path=server_public_key,
-            server_private_key_path=server_private_key
+            server_private_key_path=server_private_key,
         )
         self.rmap = RMAP(self.identity_manager)
 
