@@ -4,12 +4,11 @@ RMAP Handler - Complete RMAP functionality for Tatou server.
 This module handles all RMAP (Roger Michael Authentication Protocol) operations:
 - RMAP initialization and configuration
 - Message 1 handling (rmap-initiate)
-- Message 2 handling (rmap-get-link) 
+- Message 2 handling (rmap-get-link)
 - Watermarked PDF creation for RMAP sessions
 - Integration with the main server application
 """
 
-import hashlib
 from pathlib import Path
 from typing import Any
 
@@ -22,11 +21,11 @@ from simple_rmap import SimpleRMAP
 
 class RMAPHandler:
     """Handles all RMAP-related operations for the Tatou server."""
-    
+
     def __init__(self, app: Flask, storage_dir: str, get_engine_func):
         """
         Initialize the RMAP handler.
-        
+
         Args:
             app: Flask application instance
             storage_dir: Directory for storing files
@@ -35,41 +34,41 @@ class RMAPHandler:
         self.app = app
         self.storage_dir = storage_dir
         self.get_engine = get_engine_func
-        
+
         # Initialize RMAP instance
         self.rmap_instance = self._initialize_rmap()
-        
+
         # Register RMAP routes
         self._register_routes()
-    
+
     def _initialize_rmap(self) -> SimpleRMAP:
         """Initialize the RMAP instance with proper key paths."""
         # Set up paths for keys
         public_keys_dir = str(Path(__file__).parent.parent / "public-keys" / "pki")
         server_private_key = str(Path(__file__).parent / "server_priv.asc")
-        
+
         return SimpleRMAP(
             self.storage_dir,
             public_keys_dir=public_keys_dir,
             server_private_key=server_private_key,
         )
-    
+
     def _register_routes(self):
         """Register RMAP routes with the Flask app."""
         self.app.add_url_rule(
-            "/rmap-initiate", 
-            "rmap_initiate", 
-            self.handle_rmap_initiate, 
-            methods=["POST"]
+            "/rmap-initiate",
+            "rmap_initiate",
+            self.handle_rmap_initiate,
+            methods=["POST"],
         )
-        
+
         self.app.add_url_rule(
-            "/rmap-get-link", 
-            "rmap_get_link", 
-            self.handle_rmap_get_link, 
-            methods=["POST"]
+            "/rmap-get-link",
+            "rmap_get_link",
+            self.handle_rmap_get_link,
+            methods=["POST"],
         )
-    
+
     def handle_rmap_initiate(self):
         """Handle RMAP message 1 (initiate authentication)."""
         try:
@@ -98,7 +97,7 @@ class RMAPHandler:
             # If RMAP authentication succeeded, create watermarked PDF
             if "result" in result:
                 session_secret = result["result"]
-                
+
                 # Try to create watermarked PDF
                 pdf_result = self._create_watermarked_pdf_for_session(session_secret)
                 if pdf_result is not None:
@@ -108,14 +107,14 @@ class RMAPHandler:
 
         except Exception as e:
             return jsonify({"error": f"RMAP system error: {str(e)}"}), 503
-    
+
     def _create_watermarked_pdf_for_session(self, session_secret: str) -> Any | None:
         """
         Create a watermarked PDF for the RMAP session.
-        
+
         Args:
             session_secret: The session secret from RMAP authentication
-            
+
         Returns:
             Error response if creation fails, None if successful
         """
@@ -133,7 +132,9 @@ class RMAPHandler:
                 ).first()
 
                 if not doc_row:
-                    return jsonify({"error": "No documents available to watermark"}), 500
+                    return jsonify(
+                        {"error": "No documents available to watermark"}
+                    ), 500
 
                 # Check if we already created a watermarked version for this session
                 existing_version = conn.execute(
@@ -221,9 +222,11 @@ class RMAPHandler:
                         "path": str(dest_path),
                     },
                 )
-                
+
             self.app.logger.info(f"Created RMAP watermarked PDF: {dest_filename}")
             return None  # Success
 
         except Exception as e:
-            return jsonify({"error": f"Failed to create watermarked PDF: {str(e)}"}), 500
+            return jsonify(
+                {"error": f"Failed to create watermarked PDF: {str(e)}"}
+            ), 500
