@@ -1,7 +1,7 @@
 [
   {
     "id": "repo-sync",
-    "execute-command": "/opt/app/sync_repo_and_reload.sh",
-    "command-working-directory": "/workspace"
+    "execute-command": "/home/lab/sync_repo_and_reload.sh",
+    "command-working-directory": "/home/lab/softsec-tatou"
   }
 ]
