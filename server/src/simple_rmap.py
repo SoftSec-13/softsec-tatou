@@ -1,32 +1,51 @@
 """
-Simple RMAP (Roger Michael Authentication Protocol) implementation for Tatou.
+RMAP (Roger Michael Authentication Protocol) implementation for Tatou.
 
-This is a minimal implementation that provides the basic RMAP functionality
-without requiring external dependencies.
+Uses the proper RMAP library for cryptographic authentication between clients and server.
 """
 
 import base64
-import json
-import secrets
+from pathlib import Path
 from typing import Any
+
+from rmap.identity_manager import IdentityManager
+from rmap.rmap import RMAP
 
 
 class SimpleRMAP:
-    """Simple RMAP implementation for educational purposes."""
+    """RMAP implementation using the proper RMAP library."""
 
-    def __init__(self, storage_dir: str):
+    def __init__(self, storage_dir: str, public_keys_dir: str = None, server_private_key: str = None):
         self.storage_dir = storage_dir
-        self.sessions: dict[str, dict[str, Any]] = {}  # In-memory session storage
-        self.watermarked_pdfs: dict[
-            str, dict[str, Any]
-        ] = {}  # Store metadata about watermarked PDFs
+        self.watermarked_pdfs: dict[str, dict[str, Any]] = {}  # Store metadata about watermarked PDFs
+
+        # Set up paths for keys
+        if public_keys_dir is None:
+            # Default to public-keys/pki directory relative to server root
+            server_root = Path(__file__).parent.parent
+            public_keys_dir = str(server_root / "public-keys" / "pki")
+
+        if server_private_key is None:
+            # Default to server_priv.asc in src directory
+            server_private_key = str(Path(__file__).parent / "server_priv.asc")
+
+        # Server public key path (needed for IdentityManager)
+        server_public_key = str(Path(__file__).parent / "server_pub.asc")
+
+        # Initialize RMAP components with correct API
+        self.identity_manager = IdentityManager(
+            client_keys_dir=public_keys_dir,
+            server_public_key_path=server_public_key,
+            server_private_key_path=server_private_key
+        )
+        self.rmap = RMAP(self.identity_manager)
 
     def handle_message1(self, incoming: dict[str, Any]) -> dict[str, Any]:
         """
         Handle first RMAP message (rmap-initiate).
 
-        Expected incoming: {"payload": "<base64(encrypted_data)>"}
-        Expected decrypted content: {"nonceClient": <u64>, "identity": "<str>"}
+        Expected incoming: {"payload": "<base64(ASCII-armored PGP)>"}
+        Expected decrypted content: {"nonceClient": <u64>, "identity": "<GroupName>"}
 
         Returns: {"payload": "<base64(encrypted_response)>"} or {"error": "<reason>"}
         """
@@ -34,159 +53,56 @@ class SimpleRMAP:
             if "payload" not in incoming:
                 return {"error": "payload is required"}
 
-            payload = incoming["payload"]
-            if not payload:
-                return {"error": "payload cannot be empty"}
+            # Use RMAP library to handle message 1
+            # The library expects the exact format we receive
+            result = self.rmap.handle_message1(incoming)
 
-            # For this simple implementation, we'll decode the base64 payload
-            # and expect it to be a JSON string (without real encryption for now)
-            try:
-                decoded_payload = base64.b64decode(payload).decode("utf-8")
-                message_data = json.loads(decoded_payload)
-            except (ValueError, json.JSONDecodeError):
-                return {"error": "Invalid payload format"}
-
-            if "nonceClient" not in message_data or "identity" not in message_data:
-                return {
-                    "error": "Invalid message format - missing nonceClient or identity"
-                }
-
-            nonce_client = message_data["nonceClient"]
-            identity = message_data["identity"]
-
-            # Validate identity (for now, accept any identity)
-            if not isinstance(identity, str) or not identity:
-                return {"error": "Invalid identity"}
-
-            # Generate server nonce
-            nonce_server = secrets.randbits(64)
-
-            # Store session
-            session_key = f"{identity}_{nonce_client}_{nonce_server}"
-            self.sessions[session_key] = {
-                "identity": identity,
-                "nonceClient": nonce_client,
-                "nonceServer": nonce_server,
-                "created": True,
-            }
-
-            # Create response
-            response_data = {"nonceClient": nonce_client, "nonceServer": nonce_server}
-
-            # Encode response
-            response_json = json.dumps(response_data)
-            response_payload = base64.b64encode(response_json.encode("utf-8")).decode(
-                "utf-8"
-            )
-
-            return {"payload": response_payload}
+            return result
 
         except Exception as e:
-            return {"error": f"RMAP system initialization failed: {str(e)}"}
+            return {"error": f"RMAP processing error: {str(e)}"}
 
     def handle_message2(self, incoming: dict[str, Any]) -> dict[str, Any]:
         """
         Handle second RMAP message (rmap-get-link).
 
-        Expected incoming: {"payload": "<base64(encrypted_data)>"}
+        Expected incoming: {"payload": "<base64(ASCII-armored PGP)>"}
         Expected decrypted content: {"nonceServer": <u64>}
 
-        Returns: {"result": "<session_secret>"} or {"error": "<reason>"}
-        where session_secret is a link to a watermarked PDF created using the
-        robust-xmp method.
+        Returns: {"result": "<32-hex>"} or {"error": "<reason>"}
+        where result is the session secret (32 hex chars) used as link to watermarked PDF.
         """
         try:
             if "payload" not in incoming:
                 return {"error": "payload is required"}
 
-            payload = incoming["payload"]
-            if not payload:
-                return {"error": "payload cannot be empty"}
+            # Use RMAP library to handle message 2
+            # The library will return {"result": "hex_string"} or {"error": "message"}
+            result = self.rmap.handle_message2(incoming)
 
-            # Decode the payload
-            try:
-                decoded_payload = base64.b64decode(payload).decode("utf-8")
-                message_data = json.loads(decoded_payload)
-            except (ValueError, json.JSONDecodeError):
-                return {"error": "Invalid payload format"}
+            if "result" in result:
+                session_secret = result["result"]
 
-            if "nonceServer" not in message_data:
-                return {"error": "Invalid message format - missing nonceServer"}
+                # Ensure it's a 32-character hex string
+                if len(session_secret) < 32:
+                    session_secret = session_secret.zfill(32)
+                elif len(session_secret) > 32:
+                    session_secret = session_secret[:32]
 
-            nonce_server = message_data["nonceServer"]
+                # Store watermark metadata for this session
+                self.watermarked_pdfs[session_secret] = {
+                    "method": "robust-xmp",
+                    "created": True,
+                    "session_secret": session_secret,
+                }
 
-            # Find matching session
-            matching_session = None
-            session_key = None
-            for key, session_data in self.sessions.items():
-                if session_data["nonceServer"] == nonce_server:
-                    matching_session = session_data
-                    session_key = key
-                    break
+                return {"result": session_secret}
 
-            if not matching_session:
-                return {"error": "Invalid server nonce"}
-
-            # Create session secret (concatenation of client and server nonces)
-            nonce_client = matching_session["nonceClient"]
-            identity = matching_session["identity"]
-
-            # Convert nonces to hex representation (32 chars total)
-            client_hex = f"{nonce_client:016x}"  # 16 hex chars for 64-bit int
-            server_hex = f"{nonce_server:016x}"  # 16 hex chars for 64-bit int
-            session_secret = client_hex + server_hex  # 32 hex chars total
-
-            # Store watermark metadata for this session
-            self.watermarked_pdfs[session_secret] = {
-                "identity": identity,
-                "nonceClient": nonce_client,
-                "nonceServer": nonce_server,
-                "method": "robust-xmp",
-                "created": True,
-                "session_key": session_key,
-            }
-
-            # Mark session as completed
-            if session_key in self.sessions:
-                self.sessions[session_key]["completed"] = True
-
-            return {"result": session_secret}
+            return result
 
         except Exception as e:
-            return {"error": f"RMAP system initialization failed: {str(e)}"}
+            return {"error": f"RMAP processing error: {str(e)}"}
 
-    def get_session_info(self, session_secret: str) -> dict[str, Any] | None:
-        """Get session information by session secret."""
+    def get_watermarked_pdf_info(self, session_secret: str) -> dict[str, Any] | None:
+        """Get watermarked PDF metadata for a session secret."""
         return self.watermarked_pdfs.get(session_secret)
-
-    def create_watermarked_pdf_link(
-        self, session_secret: str, document_id: int
-    ) -> str | None:
-        """
-        Create a watermarked PDF using the session secret and return a link to it.
-
-        This integrates with the existing watermarking system to create a PDF
-        watermarked with the session secret using the robust-xmp method.
-        """
-        session_info = self.get_session_info(session_secret)
-        if not session_info:
-            return None
-
-        # For now, return the session secret as the link
-        # In a real implementation, this would create an actual watermarked PDF
-        # and store it, then return a link to download it
-        return session_secret
-
-
-def create_test_payload(nonce_client: int, identity: str) -> str:
-    """Create a test payload for testing purposes."""
-    data = {"nonceClient": nonce_client, "identity": identity}
-    json_data = json.dumps(data)
-    return base64.b64encode(json_data.encode("utf-8")).decode("utf-8")
-
-
-def create_test_payload2(nonce_server: int) -> str:
-    """Create a test payload for message 2."""
-    data = {"nonceServer": nonce_server}
-    json_data = json.dumps(data)
-    return base64.b64encode(json_data.encode("utf-8")).decode("utf-8")
