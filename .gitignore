@@ -1,3 +1,5 @@
+sync_repo_and_reload.sh
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

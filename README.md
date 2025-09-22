@@ -61,6 +61,15 @@ http -v :5000/healthz
 # Open your browser at 127.0.0.1:5000 to check if the website is up.
 ```
 
+### Deploy on production (VM)
+```bash
+# Create .env and fill with secrets
+vim .env
+
+# Deploy the containers
+docker compose -f docker-compose.prod.yml up -d
+```
+
 ### Monitor
 
 1. Open localhost:3000
