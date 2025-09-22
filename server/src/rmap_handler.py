@@ -187,7 +187,7 @@ class RMAPHandler:
                 position=None,
             )
 
-            if not isinstance(wm_bytes, (bytes, bytearray)) or len(wm_bytes) == 0:
+            if not isinstance(wm_bytes, bytes | bytearray) or len(wm_bytes) == 0:
                 return jsonify({"error": "Watermarking produced no output"}), 500
 
             # Create destination directory and file

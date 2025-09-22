@@ -1,7 +1,8 @@
 """
 RMAP (Roger Michael Authentication Protocol) implementation for Tatou.
 
-Uses the proper RMAP library for cryptographic authentication between clients and server.
+Uses the proper RMAP library for cryptographic authentication between
+clients and server.
 """
 
 from pathlib import Path
@@ -17,8 +18,8 @@ class SimpleRMAP:
     def __init__(
         self,
         storage_dir: str,
-        public_keys_dir: str = None,
-        server_private_key: str = None,
+        public_keys_dir: str | None = None,
+        server_private_key: str | None = None,
     ):
         self.storage_dir = storage_dir
         self.watermarked_pdfs: dict[
@@ -76,7 +77,8 @@ class SimpleRMAP:
         Expected decrypted content: {"nonceServer": <u64>}
 
         Returns: {"result": "<32-hex>"} or {"error": "<reason>"}
-        where result is the session secret (32 hex chars) used as link to watermarked PDF.
+        where result is the session secret (32 hex chars) used as link to
+        watermarked PDF.
         """
         try:
             if "payload" not in incoming:

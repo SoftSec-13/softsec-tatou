@@ -49,7 +49,7 @@ def create_app():
         return eng
 
     # --- RMAP initialization ---
-    rmap_handler = RMAPHandler(app, str(app.config["STORAGE_DIR"]), get_engine)
+    RMAPHandler(app, str(app.config["STORAGE_DIR"]), get_engine)
 
     # --- Helpers ---
     def _serializer():
