@@ -73,7 +73,7 @@ cp sync_repo_and_reload.sh /home/lab/.
 chmod +x /home/lab/sync_repo_and_reload.sh
 
 # Deploy the containers
-docker compose -f docker-compose.prod.yml up -d
+sudo docker compose -f docker-compose.prod.yml up -d
 ```
 
 ### Monitor
