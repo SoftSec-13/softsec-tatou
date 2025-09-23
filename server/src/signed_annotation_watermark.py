@@ -34,10 +34,10 @@ from watermarking_method import (
 )
 
 try:  # PyMuPDF is required for all operations of this method
-    import pymupdf  # type: ignore
+    import pymupdf
 
     HAS_PYMUPDF = True
-except Exception:  # pragma: no cover - environment check
+except Exception:
     HAS_PYMUPDF = False
 
 
@@ -270,15 +270,33 @@ class SignedAnnotationWatermark(WatermarkingMethod):
             if doc.page_count == 0:
                 doc.new_page()
             page = doc.load_page(0)
-            annot = page.add_text_annot([2, 2], text)
+            # Place near top-left (PDF origin is bottom-left)
+            margin = 2
+            tl_point = (margin, page.rect.height - margin)
+            annot = page.add_text_annot(tl_point, text)
             try:
-                annot.set_flags(0b1111)
+                # Flags: Invisible(1) | Hidden(2) | NoView(32) | ReadOnly(64)
+                flags = 1 | 2 | 32 | 64
+                annot.set_flags(flags)
             except Exception as exc:
                 logger.debug("Setting annotation flags failed: %s", exc)
+            try:
+                # Ensure it is not auto-open
+                if hasattr(annot, "set_open"):
+                    annot.set_open(False)
+            except Exception as exc:
+                logger.debug("Setting annotation open state failed: %s", exc)
             try:
                 annot.set_opacity(0)
             except Exception as exc:
                 logger.debug("Setting annotation opacity failed: %s", exc)
+            try:
+                # Shrink rectangle to a tiny box
+                r = annot.rect
+                tiny = pymupdf.Rect(r.x0, r.y1 - 2, r.x0 + 2, r.y1)
+                annot.set_rect(tiny)
+            except Exception as exc:
+                logger.debug("Shrinking annotation rect failed: %s", exc)
             try:
                 annot.update()
             except Exception as exc:
