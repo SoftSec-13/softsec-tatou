@@ -86,6 +86,10 @@ class SignedAnnotationWatermark(WatermarkingMethod):
         original = load_pdf_bytes(pdf)
         try:
             doc = pymupdf.open(stream=original, filetype="pdf")
+            new_doc = doc.write()  # normalize structure by reloading
+            doc.close()
+            original = load_pdf_bytes(new_doc)
+            doc = pymupdf.open(stream=original, filetype="pdf")
         except Exception as exc:  # fallback: create new doc and append original as raw?
             raise WatermarkingError(f"Failed to open PDF: {exc}") from exc
         logger = logging.getLogger(__name__)
@@ -143,12 +147,6 @@ class SignedAnnotationWatermark(WatermarkingMethod):
                 raise WatermarkingError(
                     f"Failed to attach watermark embedded file: {exc}"
                 ) from exc
-            # Final guard: PyMuPDF refuses to save zero-page PDFs – ensure at least one.
-            if doc.page_count == 0:
-                try:
-                    doc.new_page()
-                except Exception as exc:
-                    logger.debug("Failed to add final fallback page: %s", exc)
             return doc.write()
         finally:
             try:
@@ -316,6 +314,9 @@ class SignedAnnotationWatermark(WatermarkingMethod):
                 raise WatermarkingError(
                     "Referenced object missing (tampered)"
                 ) from None
+            lower = obj_str.lower()
+            if "/type /catalog" in lower or "/names" in lower:
+                continue
             b = obj_str.encode("latin-1", "replace")
             actual = self._sha256(b)
             if actual != expected:
