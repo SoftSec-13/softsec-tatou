@@ -1,9 +1,0 @@
-# To ensure app dependencies are ported from your virtual environment/host machine into your container, run 'pip freeze > requirements.txt' in the terminal to overwrite this file
-PyMuPDF>=1.21.1
-Flask>=3.0.3
-gunicorn>=23.0.0
-PyMySQL>=1.1.2
-SQLAlchemy>=2.0.43
-dill>=0.4.0
-cryptography>=3.4.0
-pyHanko>=0.23.1
