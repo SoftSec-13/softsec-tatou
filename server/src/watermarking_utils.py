@@ -35,6 +35,7 @@ from typing import Any, Final
 
 from add_after_eof import AddAfterEOF
 from robust_xmp_watermark import RobustXmpWatermark
+from signed_annotation_watermark import SignedAnnotationWatermark
 from unsafe_bash_bridge_append_eof import UnsafeBashBridgeAppendEOF
 from watermarking_method import (
     PdfSource,
@@ -50,6 +51,7 @@ METHODS: dict[str, WatermarkingMethod] = {
     AddAfterEOF.name: AddAfterEOF(),
     RobustXmpWatermark.name: RobustXmpWatermark(),
     UnsafeBashBridgeAppendEOF.name: UnsafeBashBridgeAppendEOF(),
+    SignedAnnotationWatermark.name: SignedAnnotationWatermark(),
 }
 #: Registry of available watermarking methods.
 #:
