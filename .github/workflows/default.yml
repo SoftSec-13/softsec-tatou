@@ -47,6 +47,8 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            GITHUB_TOKEN=${{ secrets.GH_TOKEN }}
 
   push:
     runs-on: ubuntu-latest
@@ -81,3 +83,5 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            GITHUB_TOKEN=${{ secrets.GH_TOKEN }}
