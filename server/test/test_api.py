@@ -11,6 +11,7 @@ import pytest
 
 from server import create_app
 
+#TODO: Make requireauth always return true for testing!
 
 @pytest.fixture
 def app():
