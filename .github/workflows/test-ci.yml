@@ -1,4 +1,4 @@
-name: test-ci
+name: Testing CI Pipeline
 
 on:
   push:
@@ -57,7 +57,7 @@ jobs:
           DB_USER: tatou
           DB_PASSWORD: tatou # pragma: allowlist secret
           TOKEN_TTL_SECONDS: 3600
-        run: |
+        run: | # change to do all tests
             pytest test_api.py
 
       - name: Upload pytest artifacts (on failure)
