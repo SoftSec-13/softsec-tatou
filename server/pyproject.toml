@@ -5,12 +5,13 @@ description = "PDF Watermarking platform"
 requires-python = ">=3.12"
 dependencies = [
 	"PyMuPDF>=1.21.1",
-	"Flask>=3.0.3",
-	"gunicorn>=23.0.0",
-	"PyMySQL>=1.1.2",
-	"SQLAlchemy>=2.0.43",
-	"dill>=0.4.0",
-	"cryptography>=3.4.0"
+	"Flask==3.0.3",
+	"gunicorn==21.2.0",
+	"PyMySQL==1.1.2",
+	"SQLAlchemy==2.0.43",
+	"dill==0.4.0",
+    "cryptography>=3.4.0",
+	"rmap @ git+https://github.com/SoftSec-13/RMAP-Server.git@v1.0.0"
 ]
 
 [project.optional-dependencies]
@@ -20,7 +21,9 @@ dev = [
     "ruff>=0.1.6",
     "mypy>=1.7.0",
     "bandit>=1.7.5",
-    "sqlfluff>=3.0.0"
+    "sqlfluff>=3.0.0",
+    "requests",
+    "types-requests>=2.28.11"
 ]
 
 [tool.pytest.ini_options]

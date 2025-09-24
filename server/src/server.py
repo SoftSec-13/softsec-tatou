@@ -13,6 +13,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
 import watermarking_utils as WMUtils
+from rmap_handler import RMAPHandler
 
 
 def create_app():
@@ -46,6 +47,9 @@ def create_app():
             eng = create_engine(db_url(), pool_pre_ping=True, future=True)
             app.config["_ENGINE"] = eng
         return eng
+
+    # --- RMAP initialization ---
+    RMAPHandler(app, str(app.config["STORAGE_DIR"]), get_engine)
 
     # --- Helpers ---
     def _serializer():
@@ -151,7 +155,6 @@ def create_app():
         except IntegrityError:
             return jsonify({"error": "email or login already exists"}), 409
         except Exception as e:
-            # Log error and return generic message
             app.logger.error("Database error in create_user: %s", e)
             return jsonify({"error": "database error"}), 503
 
@@ -190,7 +193,6 @@ def create_app():
                     return jsonify({"error": "invalid credentials"}), 401
 
         except Exception as e:
-            # Log error and return generic message
             app.logger.error(f"Database error in login: {str(e)}")
             return jsonify({"error": "An error occurred"}), 503
 
@@ -275,7 +277,8 @@ def create_app():
                     text(
                         """
                         SELECT id, name, creation, HEX(sha256) AS sha256_hex, size
-                        FROM Documents WHERE id = :id
+                        FROM Documents
+                        WHERE id = :id
                     """
                     ),
                     {"id": did},

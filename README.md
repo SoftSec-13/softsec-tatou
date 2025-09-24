@@ -77,3 +77,30 @@ sudo docker compose -f docker-compose.prod.yml up -d
 1. Open localhost:3000
 2. Login with admin:admin
 3. To view Dashboards, go to Home->Dashboards->Flask Gunicorn Logs & Metrics
+
+## Using Private GitHub Repositories in Docker
+
+This project uses a private GitHub repository as a dependency. To build the Docker image successfully, you must provide a GitHub Personal Access Token (PAT) with access to the required repository.
+
+### Steps
+
+1. **Create a Fine-Grained GitHub PAT**
+   - Go to GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens
+   - Select the organization and restrict access to only the required repository
+   - Grant the minimum permissions needed (usually `Contents: Read`)
+   - Copy the token
+
+2. **Create a `.env` file in the project root**
+   ```env
+   GITHUB_TOKEN=your_token_here
+   MARIADB_ROOT_PASSWORD=your_root_password
+   MARIADB_USER=your_user
+   MARIADB_PASSWORD=your_password
+   ```
+
+3. **Build the Docker image**
+   ```sh
+   docker-compose build
+   ```
+
+The build process will use the token only for the specified repository, following GitHub's fine-grained token permissions.
