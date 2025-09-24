@@ -78,38 +78,41 @@ sudo docker compose -f docker-compose.prod.yml up -d
 2. Login with admin:admin
 3. To view Dashboards, go to Home->Dashboards->Flask Gunicorn Logs & Metrics
 
-## Using Private GitHub Repositories in Docker
+## Environment Setup
 
-This project uses a private GitHub repository as a dependency. To build the Docker image successfully, you must provide a GitHub Personal Access Token (PAT) with access to the required repository.
+To run or build the project, you need to set up environment variables in a `.env` file at the project root. You can use the provided `.env.sample` as a template:
 
-### Steps
+```sh
+cp .env.sample .env
+```
 
-1. **Create a Fine-Grained GitHub PAT**
-   - Go to GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens
-   - Select the organization and restrict access to only the required repository
-   - Grant the minimum permissions needed (usually `Contents: Read`)
-   - Copy the token
+Edit `.env` and fill in the required values:
 
-2. **Create a `.env` file in the project root**
-   ```env
-   GITHUB_TOKEN=your_token_here
-   MARIADB_ROOT_PASSWORD=your_root_password
-   MARIADB_USER=your_user
-   MARIADB_PASSWORD=your_password
-   ```
+- `MARIADB_ROOT_PASSWORD`: Root password for MariaDB
+- `MARIADB_USER`: Database user (default: tatou)
+- `MARIADB_PASSWORD`: Database password (default: tatou)
+- `GITHUB_TOKEN`: GitHub token for accessing private dependencies during Docker builds (required)
 
-3. **Build the Docker image**
-   ```sh
-   docker-compose build
-   ```
+Example `.env.sample`:
+```
+MARIADB_ROOT_PASSWORD=your_root_password
+MARIADB_USER=tatou
+MARIADB_PASSWORD=tatou
+GITHUB_TOKEN=your_github_token_here
+```
 
-The build process will use the token only for the specified repository, following GitHub's fine-grained token permissions.
+Since private dependencies are used, you must provide a valid GitHub Personal Access Token that allows read access to https://github.com/SoftSec-13/RMAP-Server as `GITHUB_TOKEN` in your `.env` and as a secret in your repository settings. The workflow will pass this as a build argument to Docker.
+
+## Other Dependencies
+
+- MariaDB (database)
+- Python 3.12
+- Git (for installing dependencies from GitHub)
+- Any other environment variables required by your application can be added to `.env.sample` and `.env` as needed.
 
 ## Server Key Files
 
-The server requires two key files: `server_priv.asc` and `server_pub.asc`.
-
-These files are **not included in the repository** for security reasons. You must create or provide them before running the server locally or in Docker.
+The server requires two key files: `server_priv.asc` and `server_pub.asc` in `server/src/`. These are not included in the repository for security reasons. Generate or provide them before running the server or Docker Compose.
 
 Place your key files in `server/src/` as follows:
 
