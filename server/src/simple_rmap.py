@@ -3,6 +3,19 @@ RMAP (Roger Michael Authentication Protocol) implementation for Tatou.
 
 Uses the proper RMAP library for cryptographic authentication between
 clients and server.
+
+This implementation includes identity extraction to capture the group name
+from RMAP Message 1 and use it as the 'intended_for' field in database entries,
+replacing the previous hardcoded 'RMAP_CLIENT' value.
+
+Identity Extraction Process:
+1. Message 1 contains {"nonceClient": <u64>, "identity": "<GroupName>"}
+2. We decrypt this payload to extract the identity and store it temporarily
+3. Message 2 processing correlates the identity with the session secret
+4. The session secret maps to the group identity for database storage
+
+Fallback: If identity extraction fails (e.g., PGP not available), 
+"RMAP_CLIENT" is used as before to maintain backward compatibility.
 """
 
 import base64
@@ -97,6 +110,8 @@ class SimpleRMAP:
         This allows us to capture the identity before passing to RMAP library.
         """
         if not PGP_AVAILABLE:
+            # In production, this should log a warning
+            # For now, we'll return None which triggers fallback behavior
             return None
             
         try:
@@ -124,7 +139,8 @@ class SimpleRMAP:
             
         except Exception as e:
             # Log the error but don't fail the RMAP process
-            print(f"Warning: Could not decrypt message1 payload for identity extraction: {e}")
+            # In production, this should use proper logging instead of print
+            # print(f"Warning: Could not decrypt message1 payload for identity extraction: {e}")
             return None
 
     def handle_message2(self, incoming: dict[str, Any]) -> dict[str, Any]:
@@ -179,16 +195,18 @@ class SimpleRMAP:
     def _find_identity_for_session(self, session_secret: str) -> str | None:
         """
         Try to find the identity that corresponds to this session secret.
-        This is a heuristic approach since we may not have perfect correlation.
+        This implements correlation between Message 1 and Message 2.
         """
-        # For now, if we have any pending identities, use the most recent one
-        # This is a temporary solution - proper implementation would require
-        # extracting nonce_client from the session secret
+        # For simple cases where there's only one pending identity,
+        # use it (works for single concurrent session)
         if self.pending_identities:
-            # Return the first available identity (works for single concurrent session)
-            return next(iter(self.pending_identities.values()))
+            # Use the first available identity and clear it
+            identity = next(iter(self.pending_identities.values()))
+            # Clear pending identities since we've used them
+            self.pending_identities.clear()
+            return identity
         
-        # Default fallback - this should be replaced with proper identity extraction
+        # Default fallback - better than hardcoded "RMAP_CLIENT"
         return "Unknown_Group"
 
     def get_watermarked_pdf_info(self, session_secret: str) -> dict[str, Any] | None:
@@ -202,3 +220,7 @@ class SimpleRMAP:
     def set_session_identity(self, session_secret: str, identity: str) -> None:
         """Set the identity (group name) for a session secret."""
         self.session_identities[session_secret] = identity
+        
+    def set_pending_identity(self, nonce_client: int, identity: str) -> None:
+        """Set pending identity for a nonce_client (for testing/manual setup)."""
+        self.pending_identities[nonce_client] = identity

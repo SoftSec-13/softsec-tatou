@@ -205,8 +205,9 @@ class RMAPHandler:
             with self.get_engine().begin() as conn:
                 # Get the identity for this session from the RMAP instance
                 intended_for = self.rmap_instance.get_session_identity(session_secret)
-                if intended_for is None:
-                    intended_for = "RMAP_CLIENT"  # Fallback to original behavior
+                if intended_for is None or intended_for == "Unknown_Group":
+                    # Use a more descriptive fallback that indicates RMAP authentication
+                    intended_for = "RMAP_CLIENT"
                 
                 conn.execute(
                     text(
