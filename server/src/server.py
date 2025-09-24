@@ -553,8 +553,8 @@ def create_app():
     # GET /api/get-version/<link>  → returns the watermarked PDF (inline)
     @app.get("/api/get-version/<link>")
     def get_version(link: str):
-        # Expect SHA-256 style tokens to reduce brute-force signal and header abuse
-        if not re.fullmatch(r"[0-9a-f]{64}", link):
+        # Accept both 32-char (RMAP session secrets) and 64-char (SHA-256 style) tokens
+        if not re.fullmatch(r"[0-9a-f]{32}|[0-9a-f]{64}", link):
             return jsonify({"error": "document not found"}), 404
 
         try:
