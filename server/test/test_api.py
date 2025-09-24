@@ -41,7 +41,7 @@ def test_create_user_route(client):
         "password": "password",
         "email": "user@email.se",
     }  # pragma: allowlist secret
-    resp = client.post("/create-user", json=parameters)
+    resp = client.post("/api/create-user", json=parameters)
     resp_data = resp.get_json()
 
     # Note: This will likely fail due to database connectivity in tests
@@ -64,7 +64,7 @@ def test_login_route(client):
         "email": "user@email.se",
         "password": "password",
     }  # pragma: allowlist secret
-    resp = client.post("/login", json=parameters)
+    resp = client.post("/api/login", json=parameters)
     resp_data = resp.get_json()
 
     # Note: This will likely fail due to database connectivity in tests
@@ -88,7 +88,7 @@ def test_upload_document_route(client):
     #create dummy file
     pdf_file = (BytesIO(b"%PDF-1.4 dummy pdf content"), "test_document.pdf")
     parameters = {"file":pdf_file, "name":"My File"}
-    resp = client.post("/upload-document", data=parameters, content_type='multipart/form-data')
+    resp = client.post("/api/upload-document", data=parameters, content_type='multipart/form-data')
     resp_data = resp.get_json()
 
     # Should return 404 if route is commented out, or other error if route exists
@@ -156,7 +156,7 @@ def test_list_versions_route(client):
 def test_list_all_versions_route(client):
     """Test list all versions endpoint."""
     #call without parameters
-    resp = client.get("/list-versions")
+    resp = client.get("/api/list-versions")
     resp_data = resp.get_json()
 
     #basic tests
@@ -214,7 +214,7 @@ def test_read_watermark_route(client):
     parameters = {"method": "method", "position": "position", "key": "key", "id": 0}
     #parameters_no_id = {"method": "method", "position": "position", "key": "key"}
     #TODO insert useful values in parameters
-    resp = client.post("/read-watermark", json=parameters)
+    resp = client.post("/api/read-watermark", json=parameters)
     #resp = client.post("/read-watermark/0", json=parameters_no_id)
     data = resp.get_json()
 
@@ -238,7 +238,7 @@ def test_create_watermark_route(client):
                   "secret": "secret", "intended_for":"Mickey Mouse", "id": 0}
     #parameters_no_id = {"method": "method", "position": "position", "key": "key", "secret": "secret", "intended_for":"Mickey Mouse"}
     #TODO insert useful values in parameters
-    resp = client.post("/create-watermark", json=parameters)
+    resp = client.post("/api/create-watermark", json=parameters)
     #resp = client.post("/create-watermark/0", json=parameters_no_id)
     data = resp.get_json()
 
