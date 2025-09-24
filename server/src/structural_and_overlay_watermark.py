@@ -102,7 +102,7 @@ class StructuralOverlay(WatermarkingMethod):
     
     @staticmethod
     def get_fernet_from_key(key: str) -> Fernet:
-        #fixed_salt = b'my-fixed-salt-1234'  # 16 bytes is reasonable, but must remain constant
+        #16 bytes salt
         fixed_salt = b'try-and-break-me!!'
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
@@ -162,8 +162,8 @@ class StructuralOverlay(WatermarkingMethod):
                 if isinstance(xobj, dict) and "/Watermark" in xobj:
                     extracted_data.append(str(xobj["/Watermark"]))
                     break
-            else:
-                extracted_data.append(None)
+            #else:
+                #extracted_data.append(None)
 
         for item in extracted_data:
             if item:
