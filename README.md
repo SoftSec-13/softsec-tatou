@@ -104,3 +104,26 @@ This project uses a private GitHub repository as a dependency. To build the Dock
    ```
 
 The build process will use the token only for the specified repository, following GitHub's fine-grained token permissions.
+
+## Server Key Files
+
+The server requires two key files: `server_priv.asc` and `server_pub.asc`.
+
+These files are **not included in the repository** for security reasons. You must create or provide them before running the server locally or in Docker.
+
+Place your key files in `server/src/` as follows:
+
+- `server/src/server_priv.asc`
+- `server/src/server_pub.asc`
+
+If you do not have these files, you can generate them using GPG or another key generation tool. Example (GPG):
+
+```sh
+gpg --full-generate-key
+# Export the private key
+gpg --export-secret-keys --armor <KEY_ID> > server/src/server_priv.asc
+# Export the public key
+gpg --export --armor <KEY_ID> > server/src/server_pub.asc
+```
+
+Make sure these files exist before starting the server or running Docker Compose.
