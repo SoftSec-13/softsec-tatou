@@ -1,6 +1,4 @@
-```
-Inside venv:
-
+#!/bin/bash
 docker compose down -v db
 docker compose up -d db
 
@@ -10,7 +8,5 @@ export DB_PASSWORD=tatou
 export DB_NAME=tatou
 export TOKEN_TTL_SECONDS=3600
 
-Wait 5 seconds for the database to init
-
-python -m pytest test_api.py
-```
+sleep 10
+python -m pytest -vv test_api.py
