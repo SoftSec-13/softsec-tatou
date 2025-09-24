@@ -203,6 +203,11 @@ class RMAPHandler:
 
             # Store in database
             with self.get_engine().begin() as conn:
+                # Get the identity for this session from the RMAP instance
+                intended_for = self.rmap_instance.get_session_identity(session_secret)
+                if intended_for is None:
+                    intended_for = "RMAP_CLIENT"  # Fallback to original behavior
+                
                 conn.execute(
                     text(
                         """
@@ -215,7 +220,7 @@ class RMAPHandler:
                     {
                         "documentid": doc_row.id,
                         "link": session_secret,
-                        "intended_for": "RMAP_CLIENT",
+                        "intended_for": intended_for,
                         "secret": secret,
                         "method": method,
                         "position": "",
