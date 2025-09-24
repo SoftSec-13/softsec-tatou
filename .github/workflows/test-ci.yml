@@ -1,0 +1,72 @@
+name: test-ci
+
+on:
+  push:
+    branches: [ main, api-test-writing ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    services:
+      db:
+        image: mariadb:11.4
+        env:
+          MARIADB_ROOT_PASSWORD: rootpw # pragma: allowlist secret
+          MARIADB_DATABASE: tatou # pragma: allowlist secret
+          MARIADB_USER: tatou # pragma: allowlist secret
+          MARIADB_PASSWORD: tatou # pragma: allowlist secret
+        ports:
+          - 3306:3306
+        options: >- # pragma: allowlist secret
+          --health-cmd="mariadb-admin ping -h 127.0.0.1 -u root --password=rootpw --silent" \
+          --health-interval=10s --health-timeout=5s --health-retries=5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Wait for DB readiness
+        run: |
+          for i in {1..30}; do
+            if mysqladmin ping -h 127.0.0.1 -u root -prootpw --silent; then
+              echo "DB is up"; break; fi; sleep 2; done
+          mysql -h 127.0.0.1 -u root -prootpw -e 'SELECT 1;' || (echo 'DB failed' && exit 1)
+
+      - name: Load schema
+        run: |
+          mysql -h 127.0.0.1 -u root -prootpw tatou < db/tatou.sql
+
+      - name: Install deps (server)
+        working-directory: server
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[dev]'
+
+      - name: Run tests
+        working-directory: server/test
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: tatou
+          DB_USER: tatou
+          DB_PASSWORD: tatou # pragma: allowlist secret
+          TOKEN_TTL_SECONDS: 3600
+        run: |
+            pytest test_api.py
+
+      - name: Upload pytest artifacts (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-failures
+          path: |
+            server/.pytest_cache
