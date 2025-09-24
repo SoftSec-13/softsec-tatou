@@ -1,9 +1,13 @@
-import fitz  # PyMuPDF
+import pymupdf as fitz  # PyMuPDF
 from PyPDF2 import PdfReader, PdfWriter
 from PyPDF2.generic import NameObject, create_string_object, DictionaryObject, StreamObject
 import os
 import tempfile
 from io import BytesIO
+import base64
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives import hashes
+from cryptography.fernet import Fernet
 
 from watermarking_method import (
     InvalidKeyError,
@@ -23,6 +27,7 @@ class StructuralOverlay(WatermarkingMethod):
             "embedding a structural watermark. "
         )
     
+    @staticmethod
     def visible_watermark(pdf_bytes: bytes, visible_watermark: str):
         """
         Applies a visible watermark to each page of a PDF (in-memory).
@@ -48,7 +53,8 @@ class StructuralOverlay(WatermarkingMethod):
         output_stream.seek(0)
         return output_stream.read()
     
-    def structural_watermark(pdf_bytes: bytes, hidden_data: str) -> bytes:
+    @staticmethod
+    def structural_watermark(pdf_bytes: bytes, watermark_data: str) -> bytes:
         """
         Adds a hidden structural watermark to the PDF (in-memory).
         Embeds hidden data in each page's dictionary.
@@ -58,19 +64,54 @@ class StructuralOverlay(WatermarkingMethod):
         reader = PdfReader(input_stream)
         writer = PdfWriter()
 
+        #Each page is watermarked. Stripping one page won't be enough to
+        #remove the watermark
         for page in reader.pages:
-            #TODO: change watermark location, this one is too obvious
-            hidden_tag = DictionaryObject()
-            hidden_tag.update({
-                NameObject("/HiddenWatermark"): create_string_object(hidden_data)
+            # Create a fake XObject (unused)
+            dummy_stream = StreamObject()
+            dummy_stream._data = b''  # empty stream
+            dummy_stream.update({
+                NameObject("/Type"): NameObject("/XObject"),
+                NameObject("/Subtype"): NameObject("/Image"),
+                NameObject("/Width"): 1,
+                NameObject("/Height"): 1,
+                NameObject("/ColorSpace"): NameObject("/DeviceGray"),
+                NameObject("/BitsPerComponent"): 1,
+                NameObject("/Filter"): NameObject("/FlateDecode"),
+                NameObject("/Watermark"): create_string_object(watermark_data)
             })
-            page[NameObject("/Watermark")] = hidden_tag
+
+            # Add to page's XObject dictionary
+            if "/Resources" not in page:
+                page[NameObject("/Resources")] = DictionaryObject()
+            resources = page["/Resources"]
+
+            if "/XObject" not in resources:
+                resources[NameObject("/XObject")] = DictionaryObject()
+            xobjects = resources["/XObject"]
+
+            #Using an incospicuous name to try and blend in the secret better
+            xobjects[NameObject("/Xf123")] = dummy_stream
+
             writer.add_page(page)
 
         output_stream = BytesIO()
         writer.write(output_stream)
         output_stream.seek(0)
         return output_stream.read()
+    
+    @staticmethod
+    def get_fernet_from_key(key: str) -> Fernet:
+        #fixed_salt = b'my-fixed-salt-1234'  # 16 bytes is reasonable, but must remain constant
+        fixed_salt = b'try-and-break-me!!'
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=fixed_salt,
+            iterations=200_000,
+        )
+        fernet_key = base64.urlsafe_b64encode(kdf.derive(key.encode()))
+        return Fernet(fernet_key)
 
     
     def add_watermark(
@@ -94,7 +135,9 @@ class StructuralOverlay(WatermarkingMethod):
         
         #Add the "real" watermark by embedding the secret into
         #the PDF structure.
-        fully_watermarked = self.structural_watermark(visibly_watermarked, secret)
+        f = self.get_fernet_from_key(key)
+        watermark = f.encrypt(secret.encode())
+        fully_watermarked = self.structural_watermark(visibly_watermarked, watermark)
 
         return fully_watermarked
     
@@ -111,16 +154,23 @@ class StructuralOverlay(WatermarkingMethod):
         reader = PdfReader(BytesIO(pdf_bytes))
         extracted_data = []
 
+        #Cycle through each page in order to find the watermark
         for page in reader.pages:
-            # Check for our custom structural watermark
-            #TODO: change watermark location, this one is too obvious
-            watermark_obj = page.get("/Watermark")
-            if watermark_obj and "/HiddenWatermark" in watermark_obj:
-                hidden = watermark_obj["/HiddenWatermark"]
-                # Extract string, decode if necessary
-                extracted_data.append(str(hidden))
+            xobjects = page.get("/Resources", {}).get("/XObject", {})
+            for xobj in xobjects.items():
+                #Stop at first occurrence. All of them are the same.
+                if isinstance(xobj, dict) and "/Watermark" in xobj:
+                    extracted_data.append(str(xobj["/Watermark"]))
+                    break
             else:
-                extracted_data.append(None)  # No watermark found on this page
+                extracted_data.append(None)
 
-        return str(extracted_data)
+        for item in extracted_data:
+            if item:
+                f = self.get_fernet_from_key(key)
+                watermark = f.decrypt(item).decode()
+                return watermark
+        raise SecretNotFoundError("No watermark found.")
+    
+    
     
