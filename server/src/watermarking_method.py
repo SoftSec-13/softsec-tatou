@@ -160,6 +160,7 @@ class WatermarkingMethod(ABC):
         pdf: PdfSource,
         secret: str,
         key: str,
+        intended_for: str | None = None,
         position: str | None = None,
     ) -> bytes:
         """Return a new PDF with an embedded watermark.
