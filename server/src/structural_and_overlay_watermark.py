@@ -1,26 +1,27 @@
-import pymupdf as fitz 
-from PyPDF2 import PdfReader, PdfWriter
-from PyPDF2.generic import NameObject, create_string_object, DictionaryObject, StreamObject
-import os
-import tempfile
-from io import BytesIO
 import base64
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.backends import default_backend
+from io import BytesIO
+
+import pymupdf as fitz
 from cryptography.fernet import Fernet, InvalidToken
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from PyPDF2 import PdfReader, PdfWriter
+from PyPDF2.generic import (
+    DictionaryObject,
+    NameObject,
+    create_string_object,
+)
 
 from watermarking_method import (
     InvalidKeyError,
     PdfSource,
-    SecretNotFoundError,
-    WatermarkingError,
     WatermarkingMethod,
     load_pdf_bytes,
 )
 
-class StructuralOverlay(WatermarkingMethod):
 
+class StructuralOverlay(WatermarkingMethod):
     name = "overlay-watermark"
 
     @staticmethod
@@ -29,6 +30,7 @@ class StructuralOverlay(WatermarkingMethod):
             "Method that overlays a visible watermark as well as"
             "embedding a structural watermark. "
         )
+
     @staticmethod
     def visible_watermark(pdf_bytes: bytes, visible_watermark: str):
         """
@@ -44,12 +46,12 @@ class StructuralOverlay(WatermarkingMethod):
                 visible_watermark,
                 fontsize=18,
                 rotate=0,
-                fill=(0.6, 0.6, 0.6),       # fill color (gray)
+                fill=(0.6, 0.6, 0.6),  # fill color (gray)
                 color=(0, 0, 0),
                 overlay=True,
                 render_mode=2,  # stroke + fill
-                fill_opacity = 0.5,
-                stroke_opacity=0.5
+                fill_opacity=0.5,
+                stroke_opacity=0.5,
             )
 
         output_stream = BytesIO()
@@ -57,7 +59,7 @@ class StructuralOverlay(WatermarkingMethod):
         doc.close()
         output_stream.seek(0)
         return output_stream.read()
-    
+
     @staticmethod
     def structural_watermark(pdf_bytes: bytes, hidden_data: str) -> bytes:
         """
@@ -69,16 +71,14 @@ class StructuralOverlay(WatermarkingMethod):
         reader = PdfReader(input_stream)
         writer = PdfWriter()
 
-        #Creating an incospicuous location to hide the watermark.
-        #Adding in /PieceInfo (app. specific metadata)
-        #Obfuscated name makes it less obvious than "/Watermark"
+        # Creating an incospicuous location to hide the watermark.
+        # Adding in /PieceInfo (app. specific metadata)
+        # Obfuscated name makes it less obvious than "/Watermark"
         obfuscated_key = NameObject("/XObjD5fA2e1")
 
         for page in reader.pages:
             piece_info = page.get("/PieceInfo") or DictionaryObject()
-            piece_info.update({
-                obfuscated_key: create_string_object(hidden_data)
-            })
+            piece_info.update({obfuscated_key: create_string_object(hidden_data)})
             page[NameObject("/PieceInfo")] = piece_info
             writer.add_page(page)
 
@@ -87,42 +87,40 @@ class StructuralOverlay(WatermarkingMethod):
         output_stream.seek(0)
         return output_stream.read()
 
-    
     def add_watermark(
         self,
         pdf,
         secret: str,
         key: str,
-        intended_for: str| None = None,
+        intended_for: str | None = None,
         position: str | None = None,
     ) -> bytes:
-        
         data = load_pdf_bytes(pdf)
-        #Add a visible watermark. This might confuse the attackers,
-        #suggesting that the only watermark is the visible watermark.
-        #It also works as a deterrent against document diffusion.
+        # Add a visible watermark. This might confuse the attackers,
+        # suggesting that the only watermark is the visible watermark.
+        # It also works as a deterrent against document diffusion.
         if not intended_for:
             raise ValueError("Missing recipient. (intended_for)")
-        visibly_watermarked = self.visible_watermark(data, "Intended for: " + 
-                                                     intended_for + 
-                                                     "\nDo not disclose")
+        visibly_watermarked = self.visible_watermark(
+            data, "Intended for: " + intended_for + "\nDo not disclose"
+        )
 
         if not secret:
             raise ValueError("Secret must be a non-empty string")
         if not isinstance(key, str) or not key:
             raise ValueError("Key must be a non-empty string")
-        
-        #Add the "real" watermark by embedding the secret into
-        #the PDF structure.
-        #Encrypt the secret for extra security
+
+        # Add the "real" watermark by embedding the secret into
+        # the PDF structure.
+        # Encrypt the secret for extra security
         derived_key = self.derive_fernet_key(key)
         fernet = Fernet(derived_key)
         encrypted_secret = fernet.encrypt(secret.encode()).decode()
-        fully_watermarked = self.structural_watermark(visibly_watermarked,
-                                                      encrypted_secret)
+        fully_watermarked = self.structural_watermark(
+            visibly_watermarked, encrypted_secret
+        )
 
         return fully_watermarked
-    
 
     def is_watermark_applicable(
         self,
@@ -130,7 +128,7 @@ class StructuralOverlay(WatermarkingMethod):
         position: str | None = None,
     ) -> bool:
         return True
-    
+
     @staticmethod
     def derive_fernet_key(password: str) -> bytes:
         """
@@ -139,12 +137,12 @@ class StructuralOverlay(WatermarkingMethod):
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
-            salt=b"try_and_break_me",  
+            salt=b"try_and_break_me",
             iterations=200_000,
             backend=default_backend(),
         )
         return base64.urlsafe_b64encode(kdf.derive(password.encode()))
-    
+
     def read_secret(self, pdf: PdfSource, key: str) -> str:
         pdf_bytes = load_pdf_bytes(pdf)
         reader = PdfReader(BytesIO(pdf_bytes))
@@ -160,7 +158,7 @@ class StructuralOverlay(WatermarkingMethod):
                 # Extract string
                 encrypted_str = str(hidden)
 
-                #Try decryption, catch exceptions
+                # Try decryption, catch exceptions
                 try:
                     derived_key = self.derive_fernet_key(key)
                     fernet = Fernet(derived_key)

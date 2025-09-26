@@ -1,22 +1,25 @@
-import os
 from pathlib import Path
+
 from structural_and_overlay_watermark import StructuralOverlay
 from watermarking_method import SecretNotFoundError
+
 
 def load_pdf(path: str) -> bytes:
     """Loads a PDF file as bytes."""
     with open(path, "rb") as f:
         return f.read()
 
+
 def save_pdf(path: str, data: bytes):
     """Saves PDF bytes to a file."""
     with open(path, "wb") as f:
         f.write(data)
 
+
 def main():
-    input_pdf_path = "input.pdf"         # ✅ PDF path
+    input_pdf_path = "input.pdf"  # ✅ PDF path
     output_pdf_path = "watermarked.pdf"  # ✅ Output file path
-    hidden_val = "hidden-example-value" #nosec
+    hidden_val = "hidden-example-value"  # nosec
     key = "strong-password"
 
     if not Path(input_pdf_path).exists():
@@ -31,10 +34,7 @@ def main():
     # Add watermark
     print("🔐 Embedding watermark...")
     watermarked_pdf = method.add_watermark(
-        pdf=original_pdf_bytes,
-        secret=hidden_val,
-        key=key,
-        intended_for="John Smith"
+        pdf=original_pdf_bytes, secret=hidden_val, key=key, intended_for="John Smith"
     )
 
     # Save watermarked PDF
@@ -48,8 +48,9 @@ def main():
         print(f"✅ Extracted secret: {extracted}")
     except SecretNotFoundError:
         print("❌ No watermark found in the PDF.")
-    #except Exception as e:
-        #print(f"❌ Error while extracting secret: {e}")
+    # except Exception as e:
+    # print(f"❌ Error while extracting secret: {e}")
+
 
 if __name__ == "__main__":
     main()
