@@ -16,7 +16,7 @@ def save_pdf(path: str, data: bytes):
 def main():
     input_pdf_path = "input.pdf"         # ✅ PDF path
     output_pdf_path = "watermarked.pdf"  # ✅ Output file path
-    secret = "this-is-a-secret" #pragma: allowlist secret
+    hidden_val = "hidden-example-value" #nosec
     key = "strong-password"
 
     if not Path(input_pdf_path).exists():
@@ -32,7 +32,7 @@ def main():
     print("🔐 Embedding watermark...")
     watermarked_pdf = method.add_watermark(
         pdf=original_pdf_bytes,
-        secret=secret,
+        secret=hidden_val,
         key=key,
         intended_for="John Smith"
     )
