@@ -841,6 +841,9 @@ def create_app():
             return jsonify({"error": "watermark applicability check failed"}), 400
 
         # apply watermark → bytes
+        # Note: intended_for is not passed to the watermarking method as it's
+        # handled at the server/database level for recipient tracking and file naming.
+        # The watermarking methods focus solely on embedding the secret.
         try:
             wm_bytes: bytes = WMUtils.apply_watermark(
                 pdf=str(file_path),

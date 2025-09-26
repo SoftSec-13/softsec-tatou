@@ -32,6 +32,22 @@ implement the two abstract methods:
     :class:`SecretNotFoundError` when no recognizable watermark is
     present and :class:`InvalidKeyError` when the key is incorrect.
 
+Design rationale: Separation of concerns
+----------------------------------------
+The watermarking methods focus solely on the cryptographic and technical
+aspects of embedding/extracting secrets. Recipient information 
+(``intended_for``) is managed at the server/database level for the
+following reasons:
+
+- **Clean abstraction**: Methods don't need to know about business logic
+- **Database tracking**: Recipient info is stored in the Versions table
+- **File management**: Used for generating appropriate filenames  
+- **Backward compatibility**: Existing methods work without changes
+
+If recipient information needs to be embedded in the watermark itself,
+it should be incorporated into the ``secret`` parameter rather than
+adding a new method parameter.
+
 Utilities
 ---------
 This module also exposes :func:`load_pdf_bytes` and :func:`is_pdf_bytes`

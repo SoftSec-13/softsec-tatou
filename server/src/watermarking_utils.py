@@ -95,7 +95,12 @@ def apply_watermark(
     key: str,
     position: str | None = None,
 ) -> bytes:
-    """Apply a watermark using the specified method and return new PDF bytes."""
+    """Apply a watermark using the specified method and return new PDF bytes.
+    
+    Note: Recipient information (intended_for) is not passed to watermarking
+    methods as it's handled at the server level for database tracking and
+    file management. Methods focus on embedding the provided secret.
+    """
     m = get_method(method)
     return m.add_watermark(pdf=pdf, secret=secret, key=key, position=position)
 

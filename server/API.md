@@ -352,7 +352,7 @@ This endpoint reads information contain in a pdf document's watermark with the p
    ## create-watermark
 
 **Description**
-This endpoint reads information contain in a pdf document's watermark with the provided method.
+This endpoint creates a watermarked version of a PDF document using the specified method.
 
 **Path**
 `POST /api/create-watermark`
@@ -400,6 +400,9 @@ This endpoint reads information contain in a pdf document's watermark with the p
 ```
 
 **Specification**
+ * Requires authentication
+ * The `intended_for` parameter is used for recipient tracking and file naming, but is not embedded in the watermark itself
+ * The watermarking method receives only the `secret`, `key`, and `position` parameters
  * Only the owner of a document should be able to create watermarks for their documents.
 
 ---
