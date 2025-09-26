@@ -97,7 +97,7 @@ class RobustXmpWatermark(WatermarkingMethod):
         pdf: PdfSource,
         secret: str,
         key: str,
-        intended_for: str| None = None,
+        intended_for: str | None = None,
         position: str | None = None,
     ) -> bytes:
         """Add a robust watermark to the PDF.

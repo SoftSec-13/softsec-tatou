@@ -74,7 +74,7 @@ class SignedAnnotationWatermark(WatermarkingMethod):
         pdf: PdfSource,
         secret: str,
         key: str,
-        intended_for: str| None = None,
+        intended_for: str | None = None,
         position: str | None = None,
     ) -> bytes:
         if not HAS_PYMUPDF:
