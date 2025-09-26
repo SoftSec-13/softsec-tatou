@@ -103,7 +103,9 @@ class StructuralOverlay(WatermarkingMethod):
         #It also works as a deterrent against document diffusion.
         if not intended_for:
             raise ValueError("Missing recipient. (intended_for)")
-        visibly_watermarked = self.visible_watermark(data, "Intended for: " + intended_for + "\nDo not disclose")
+        visibly_watermarked = self.visible_watermark(data, "Intended for: " + 
+                                                     intended_for + 
+                                                     "\nDo not disclose")
 
         if not secret:
             raise ValueError("Secret must be a non-empty string")
@@ -116,7 +118,8 @@ class StructuralOverlay(WatermarkingMethod):
         derived_key = self.derive_fernet_key(key)
         fernet = Fernet(derived_key)
         encrypted_secret = fernet.encrypt(secret.encode()).decode()
-        fully_watermarked = self.structural_watermark(visibly_watermarked, encrypted_secret)
+        fully_watermarked = self.structural_watermark(visibly_watermarked,
+                                                      encrypted_secret)
 
         return fully_watermarked
     
@@ -130,7 +133,7 @@ class StructuralOverlay(WatermarkingMethod):
     
     @staticmethod
     def derive_fernet_key(password: str) -> bytes:
-        """                                              
+        """
         Derive a Fernet-compatible key from a string password using PBKDF2.
         """
         kdf = PBKDF2HMAC(
@@ -164,7 +167,7 @@ class StructuralOverlay(WatermarkingMethod):
                     decrypted = fernet.decrypt(encrypted_str.encode()).decode()
                     extracted_data.append(decrypted)
                 except InvalidToken as e:
-                    raise InvalidKeyError("Failed to decrypt watermark: " + str(e))
+                    raise InvalidKeyError("Failed to decrypt watermark") from e
             else:
                 extracted_data.append(None)  # No watermark found on this page
 
