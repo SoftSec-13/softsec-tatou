@@ -16,7 +16,7 @@ def save_pdf(path: str, data: bytes):
 def main():
     input_pdf_path = "input.pdf"         # ✅ PDF path
     output_pdf_path = "watermarked.pdf"  # ✅ Output file path
-    secret = "this-is-a-secret"
+    secret = "this-is-a-secret" #pragma: allowlist secret
     key = "strong-password"
 
     if not Path(input_pdf_path).exists():
