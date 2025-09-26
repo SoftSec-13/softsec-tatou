@@ -200,7 +200,6 @@ class WatermarkingMethod(ABC):
     def is_watermark_applicable(
         self,
         pdf: PdfSource,
-        intended_for: str | None = None,
         position: str | None = None,
     ) -> bool:
         """Return whether the method is applicable on this specific method
