@@ -5,10 +5,14 @@ services:
     build:
       context: server
       dockerfile: Dockerfile
+      args:
+        GITHUB_TOKEN: ${GITHUB_TOKEN}
     ports:
       - "5000:5000"
     volumes:
       - user-files:/app/storage
+      - ./server/src/server_priv.asc:/app/server_priv.asc:ro
+      - ./server/src/server_pub.asc:/app/server_pub.asc:ro
     environment:
       - PYTHONUNBUFFERED=1
       # DB connection details for future use by the API
