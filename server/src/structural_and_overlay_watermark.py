@@ -26,7 +26,7 @@ class StructuralOverlay(WatermarkingMethod):
     @staticmethod
     def get_usage() -> str:
         return (
-            "Toy method that overlays a visible watermark as well as"
+            "Method that overlays a visible watermark as well as"
             "embedding a structural watermark. "
         )
     @staticmethod
