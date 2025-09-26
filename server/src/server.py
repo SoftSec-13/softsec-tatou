@@ -847,6 +847,7 @@ def create_app():
                 secret=secret,
                 key=key,
                 method=method,
+                intended_for=intended_for,
                 position=position,
             )
             if not isinstance(wm_bytes, bytes | bytearray) or len(wm_bytes) == 0:

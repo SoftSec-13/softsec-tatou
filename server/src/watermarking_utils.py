@@ -36,6 +36,7 @@ from typing import Any, Final
 from add_after_eof import AddAfterEOF
 from robust_xmp_watermark import RobustXmpWatermark
 from signed_annotation_watermark import SignedAnnotationWatermark
+from structural_and_overlay_watermark import StructuralOverlay
 from unsafe_bash_bridge_append_eof import UnsafeBashBridgeAppendEOF
 from watermarking_method import (
     PdfSource,
@@ -50,6 +51,7 @@ from watermarking_method import (
 METHODS: dict[str, WatermarkingMethod] = {
     AddAfterEOF.name: AddAfterEOF(),
     RobustXmpWatermark.name: RobustXmpWatermark(),
+    StructuralOverlay.name: StructuralOverlay(),
     UnsafeBashBridgeAppendEOF.name: UnsafeBashBridgeAppendEOF(),
     SignedAnnotationWatermark.name: SignedAnnotationWatermark(),
 }
@@ -93,11 +95,12 @@ def apply_watermark(
     pdf: PdfSource,
     secret: str,
     key: str,
+    intended_for: str | None = None,
     position: str | None = None,
 ) -> bytes:
     """Apply a watermark using the specified method and return new PDF bytes."""
     m = get_method(method)
-    return m.add_watermark(pdf=pdf, secret=secret, key=key, position=position)
+    return m.add_watermark(pdf=pdf, secret=secret, key=key, intended_for=intended_for, position=position)
 
 
 def is_watermarking_applicable(
