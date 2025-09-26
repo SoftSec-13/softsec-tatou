@@ -21,6 +21,8 @@ from watermarking_method import (
 
 class StructuralOverlay(WatermarkingMethod):
 
+    name = "overlay-watermark"
+
     @staticmethod
     def get_usage() -> str:
         return (
