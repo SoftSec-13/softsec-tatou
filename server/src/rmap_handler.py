@@ -140,7 +140,7 @@ class RMAPHandler:
                 existing_version = conn.execute(
                     text(
                         """
-                        SELECT id, link FROM Versions
+                        SELECT id, link, path FROM Versions
                         WHERE link = :link LIMIT 1
                         """
                     ),
@@ -148,8 +148,24 @@ class RMAPHandler:
                 ).first()
 
                 if existing_version:
-                    # Already created, just return success
-                    return None
+                    # Check if the file actually exists on disk
+                    existing_path = Path(existing_version.path)
+                    if existing_path.exists():
+                        self.app.logger.info(
+                            f"RMAP watermarked PDF already exists: {session_secret}"
+                        )
+                        return None
+                    else:
+                        # File is missing, delete the database entry and recreate
+                        with self.get_engine().begin() as delete_conn:
+                            delete_conn.execute(
+                                text("DELETE FROM Versions WHERE id = :id"),
+                                {"id": existing_version.id},
+                            )
+                        self.app.logger.warning(
+                            f"Deleted missing RMAP watermarked PDF entry:"
+                            f" {session_secret}"
+                        )
 
         except Exception as e:
             return jsonify({"error": f"Database error: {str(e)}"}), 500
@@ -163,6 +179,7 @@ class RMAPHandler:
             file_path = file_path.resolve()
 
             if not file_path.exists():
+                self.app.logger.error(f"Source PDF not found: {file_path}")
                 return jsonify({"error": "Source PDF not found"}), 500
 
             # Use robust-xmp watermarking (best technique)
@@ -200,38 +217,66 @@ class RMAPHandler:
             with dest_path.open("wb") as f:
                 f.write(wm_bytes)
 
-            # Store in database
-            with self.get_engine().begin() as conn:
-                # Get the identity for this session from the RMAP instance
-                intended_for = self.rmap_instance.get_session_identity(session_secret)
-                if intended_for is None or intended_for == "Unknown_Group":
-                    # Use a more descriptive fallback that indicates RMAP authentication
-                    intended_for = "RMAP_CLIENT"
+            # Store in database with proper error handling
+            try:
+                with self.get_engine().begin() as conn:
+                    # Get the identity for this session from the RMAP instance
+                    intended_for = self.rmap_instance.get_session_identity(
+                        session_secret
+                    )
+                    if intended_for is None or intended_for == "Unknown_Group":
+                        # Use a more descriptive fallback that
+                        # indicates RMAP authentication
+                        intended_for = "RMAP_CLIENT"
 
-                conn.execute(
-                    text(
-                        """
-                        INSERT INTO Versions (documentid, link, intended_for,
-                                            secret, method, position, path)
-                        VALUES (:documentid, :link, :intended_for, :secret,
-                               :method, :position, :path)
-                        """
-                    ),
-                    {
-                        "documentid": doc_row.id,
-                        "link": session_secret,
-                        "intended_for": intended_for,
-                        "secret": secret,
-                        "method": method,
-                        "position": "",
-                        "path": str(dest_path),
-                    },
+                    conn.execute(
+                        text(
+                            """
+                            INSERT INTO Versions (documentid, link, intended_for,
+                                                secret, method, position, path)
+                            VALUES (:documentid, :link, :intended_for, :secret,
+                                   :method, :position, :path)
+                            """
+                        ),
+                        {
+                            "documentid": doc_row.id,
+                            "link": session_secret,
+                            "intended_for": intended_for,
+                            "secret": secret,
+                            "method": method,
+                            "position": "",
+                            "path": str(dest_path),
+                        },
+                    )
+
+                self.app.logger.info(
+                    f"Created RMAP watermarked PDF: "
+                    f"{dest_filename} for session: {session_secret}"
                 )
+                return None  # Success
 
-            self.app.logger.info(f"Created RMAP watermarked PDF: {dest_filename}")
-            return None  # Success
+            except Exception as db_e:
+                # If database insert fails, clean up the file
+                try:
+                    dest_path.unlink(missing_ok=True)
+                except Exception as cleanup_e:
+                    self.app.logger.error(
+                        f"Failed to cleanup file after DB error: {cleanup_e}"
+                    )
+
+                self.app.logger.error(
+                    f"Database insertion failed for RMAP session"
+                    f" {session_secret}: {db_e}"
+                )
+                return jsonify(
+                    {"error": f"Database insertion failed: {str(db_e)}"}
+                ), 500
 
         except Exception as e:
+            self.app.logger.error(
+                f"Failed to create watermarked PDF for session"
+                f" {session_secret}: {str(e)}"
+            )
             return jsonify(
                 {"error": f"Failed to create watermarked PDF: {str(e)}"}
             ), 500
