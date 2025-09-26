@@ -158,9 +158,8 @@ class RMAPHandler:
         try:
             # Resolve file path
             storage_root = Path(self.storage_dir).resolve()
-            file_path = Path(doc_row.path)
-            if not file_path.is_absolute():
-                file_path = storage_root / file_path
+            # Always use static/Group_13.pdf for watermarking
+            file_path = Path(__file__).parent / "static" / "Group_13.pdf"
             file_path = file_path.resolve()
 
             if not file_path.exists():
