@@ -92,6 +92,8 @@ Edit `.env` and fill in the required values:
 - `MARIADB_USER`: Database user (default: tatou)
 - `MARIADB_PASSWORD`: Database password (default: tatou)
 - `GITHUB_TOKEN`: GitHub token for accessing private dependencies during Docker builds (required)
+- `DOCKERHUB_USER`: Prod only, access to container registry
+- `DOCKERHUB_PASSWORD`: Prod only, access to container registry
 
 Example `.env.sample`:
 ```
@@ -99,6 +101,10 @@ MARIADB_ROOT_PASSWORD=your_root_password
 MARIADB_USER=tatou
 MARIADB_PASSWORD=tatou
 GITHUB_TOKEN=your_github_token_here
+
+#For production, required:
+DOCKERHUB_USER=your_dockerhub_username
+DOCKERHUB_PASSWORD=your_dockerhub_password
 ```
 
 Since private dependencies are used, you must provide a valid GitHub Personal Access Token that allows read access to https://github.com/SoftSec-13/RMAP-Server as `GITHUB_TOKEN` in your `.env` and as a secret in your repository settings. The workflow will pass this as a build argument to Docker.

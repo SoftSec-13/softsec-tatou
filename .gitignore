@@ -1,3 +1,9 @@
+# Ignore pdfs
+*.pdf
+
+# Ignore debug files
+.vscode/
+
 # Ignore keys
 server/src/server_pub.asc
 server/src/server_priv.asc
