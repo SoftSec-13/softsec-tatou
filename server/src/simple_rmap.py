@@ -10,6 +10,7 @@ from RMAP Message 1 and use it as the 'intended_for' field in database entries.
 
 import base64
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -62,6 +63,7 @@ class SimpleRMAP:
             client_keys_dir=public_keys_dir,
             server_public_key_path=server_public_key,
             server_private_key_path=server_private_key,
+            server_private_key_passphrase=os.getenv("PRIVKEY_PASSPHRASE", ""),
         )
         self.rmap = RMAP(self.identity_manager)
 
@@ -111,6 +113,13 @@ class SimpleRMAP:
 
             # Load the private key
             server_key, _ = PGPKey.from_file(server_private_key_path)
+
+            # Unlock the private key if it's protected
+            if server_key.is_protected:
+                passphrase = os.getenv("PRIVKEY_PASSPHRASE", "")
+                if not passphrase:
+                    return None
+                server_key.unlock(passphrase)
 
             # Decode the base64 payload
             encrypted_armored = base64.b64decode(payload).decode("utf-8")
