@@ -120,22 +120,6 @@ class RMAPHandler:
         """
         try:
             with self.get_engine().connect() as conn:
-                # Find the most recent document to watermark
-                doc_row = conn.execute(
-                    text(
-                        """
-                        SELECT id, name, path FROM Documents
-                        ORDER BY creation DESC
-                        LIMIT 1
-                        """
-                    )
-                ).first()
-
-                if not doc_row:
-                    return jsonify(
-                        {"error": "No documents available to watermark"}
-                    ), 500
-
                 # Check if we already created a watermarked version for this session
                 existing_version = conn.execute(
                     text(
@@ -229,6 +213,14 @@ class RMAPHandler:
                         # indicates RMAP authentication
                         intended_for = "RMAP_CLIENT"
 
+                    did = int(
+                        conn.execute(
+                            text("SELECT LAST_INSERT_ID() FROM Versions")
+                        ).scalar()
+                    )
+                    if did is None:
+                        did = 1  # Fallback if no previous entries
+
                     conn.execute(
                         text(
                             """
@@ -239,7 +231,7 @@ class RMAPHandler:
                             """
                         ),
                         {
-                            "documentid": doc_row.id,
+                            "documentid": did,
                             "link": session_secret,
                             "intended_for": intended_for,
                             "secret": secret,
