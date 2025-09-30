@@ -9,6 +9,7 @@ This module handles all RMAP (Roger Michael Authentication Protocol) operations:
 - Integration with the main server application
 """
 
+import hashlib
 from pathlib import Path
 from typing import Any
 
@@ -166,6 +167,84 @@ class RMAPHandler:
                 self.app.logger.error(f"Source PDF not found: {file_path}")
                 return jsonify({"error": "Source PDF not found"}), 500
 
+            # Add file to database if not already present
+            try:
+                with self.get_engine().begin() as conn:
+                    existing_file = conn.execute(
+                        text(
+                            """
+                            SELECT id FROM Documents WHERE path = :path LIMIT 1
+                            """
+                        ),
+                        {"path": str(file_path)},
+                    ).first()
+
+                    if not existing_file:
+                        # Need to insert a full Documents row following schema:
+                        # (name, path, ownerid, sha256, size)
+                        # We don't have an authenticated user in RMAP flow, so we
+                        # assign ownership to the earliest (lowest id) existing user
+                        # to satisfy the FK. If no users exist, we cannot proceed.
+                        owner_row = conn.execute(
+                            text("SELECT id FROM Users WHERE email = 'service@rmap.su'")
+                        ).first()
+                        if not owner_row:
+                            raise RuntimeError(
+                                "No users exist to own RMAP base document; "
+                                "create a user first"
+                            )
+                        owner_id = int(owner_row.id)
+
+                        # Gather file metadata
+                        try:
+                            pdf_bytes = file_path.read_bytes()
+                        except Exception as fe:
+                            raise RuntimeError(
+                                f"Failed reading source PDF for RMAP insertion: {fe}"
+                            ) from fe
+                        sha_hex = hashlib.sha256(pdf_bytes).hexdigest()
+                        size = len(pdf_bytes)
+                        name = file_path.name
+
+                        # Attempt insert; tolerate race where another thread
+                        # inserted meanwhile
+                        try:
+                            conn.execute(
+                                text(
+                                    """
+                                    INSERT INTO Documents (name, path, ownerid,
+                                                          sha256, size)
+                                    VALUES (:name, :path, :ownerid,
+                                            UNHEX(:sha256hex), :size)
+                                    """
+                                ),
+                                {
+                                    "name": name,
+                                    "path": str(file_path),
+                                    "ownerid": owner_id,
+                                    "sha256hex": sha_hex,
+                                    "size": int(size),
+                                },
+                            )
+                        except Exception as race_e:
+                            # If due to unique path constraint, fetch existing id;
+                            # otherwise re-raise
+                            try:
+                                existing_file = conn.execute(
+                                    text(
+                                        "SELECT id FROM Documents WHERE path = :path "
+                                        "LIMIT 1"
+                                    ),
+                                    {"path": str(file_path)},
+                                ).first()
+                                if not existing_file:
+                                    raise race_e
+                            except Exception:
+                                raise
+            except Exception as db_e:
+                self.app.logger.error(f"Failed to add source PDF to database: {db_e}")
+                return jsonify({"error": f"Database error: {str(db_e)}"}), 500
+
             # Use robust-xmp watermarking (best technique)
             method = "robust-xmp"
             secret = session_secret  # Use session secret as watermark
@@ -213,13 +292,18 @@ class RMAPHandler:
                         # indicates RMAP authentication
                         intended_for = "RMAP_CLIENT"
 
-                    did = int(
-                        conn.execute(
-                            text("SELECT LAST_INSERT_ID() FROM Versions")
-                        ).scalar()
-                    )
-                    if did is None:
-                        did = 1  # Fallback if no previous entries
+                    # Get file ID
+                    file_record = conn.execute(
+                        text(
+                            """
+                            SELECT id FROM Documents WHERE path = :path LIMIT 1
+                            """
+                        ),
+                        {"path": str(file_path)},
+                    ).first()
+                    if file_record is None:
+                        return jsonify({"error": "File record not found"}), 500
+                    did = file_record.id
 
                     conn.execute(
                         text(
