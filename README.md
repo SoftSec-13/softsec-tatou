@@ -94,6 +94,7 @@ Edit `.env` and fill in the required values:
 - `GITHUB_TOKEN`: GitHub token for accessing private dependencies during Docker builds (required)
 - `DOCKERHUB_USER`: Prod only, access to container registry
 - `DOCKERHUB_PASSWORD`: Prod only, access to container registry
+- `PRIVKEY_PASSPHRASE`: The passphrase for the private key
 
 Example `.env.sample`:
 ```
@@ -105,6 +106,7 @@ GITHUB_TOKEN=your_github_token_here
 #For production, required:
 DOCKERHUB_USER=your_dockerhub_username
 DOCKERHUB_PASSWORD=your_dockerhub_password
+PRIVKEY_PASSPHRASE=priv key passprase
 ```
 
 Since private dependencies are used, you must provide a valid GitHub Personal Access Token that allows read access to https://github.com/SoftSec-13/RMAP-Server as `GITHUB_TOKEN` in your `.env` and as a secret in your repository settings. The workflow will pass this as a build argument to Docker.
