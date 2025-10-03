@@ -2,10 +2,11 @@ import datetime as dt
 import hashlib
 import os
 import re
+import time
 from functools import wraps
 from pathlib import Path
 
-from flask import Flask, g, jsonify, request, send_file
+from flask import Flask, Response, g, jsonify, request, send_file
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError
@@ -13,7 +14,25 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
 import watermarking_utils as WMUtils
-from rmap_handler import RMAPHandler
+from observability import (
+    inc_db_error,
+    inc_login_failure,
+    inc_suspicious,
+    inc_upload,
+    inc_watermark_created,
+    inc_watermark_read,
+    record_request,
+    render_prometheus,
+)
+
+RMAPHandler = None  # default
+if not os.environ.get("TATOU_TEST_DISABLE_RMAP"):
+    try:  # Allow tests to disable RMAP dependency via env var
+        from rmap_handler import RMAPHandler as _RMAPHandler  # type: ignore
+
+        RMAPHandler = _RMAPHandler
+    except Exception:  # pragma: no cover - degrade gracefully if missing
+        RMAPHandler = None  # type: ignore
 
 
 def create_app():
@@ -48,8 +67,12 @@ def create_app():
             app.config["_ENGINE"] = eng
         return eng
 
-    # --- RMAP initialization ---
-    RMAPHandler(app, str(app.config["STORAGE_DIR"]), get_engine)
+    # --- RMAP initialization (skippable in tests) ---
+    if RMAPHandler is not None:
+        try:
+            RMAPHandler(app, str(app.config["STORAGE_DIR"]), get_engine)
+        except Exception as e:  # pragma: no cover - defensive; don't fail app
+            app.logger.warning(f"RMAP initialization failed (continuing): {e}")
 
     # --- Helpers ---
     def _serializer():
@@ -88,6 +111,26 @@ def create_app():
             for chunk in iter(lambda: f.read(1024 * 1024), b""):
                 h.update(chunk)
         return h.hexdigest()
+
+    # --- Request instrumentation hooks ---
+    @app.before_request  # type: ignore
+    def _tatou_before():
+        try:  # record start for latency
+            request._tatou_start = time.time()  # type: ignore[attr-defined]
+        except Exception as exc:  # pragma: no cover - defensive
+            app.logger.error("before_request instrumentation failed: %s", exc)
+
+    @app.after_request  # type: ignore
+    def _tatou_after(resp):
+        try:
+            start = getattr(request, "_tatou_start", None)
+            if start is not None:
+                dur = time.time() - start
+                route = request.url_rule.rule if request.url_rule else request.path
+                record_request(request.method, route, resp.status_code, dur)
+        except Exception as exc:  # pragma: no cover - defensive
+            app.logger.error("after_request instrumentation failed: %s", exc)
+        return resp
 
     # --- Routes ---
 
@@ -189,11 +232,16 @@ def create_app():
                     row = None
 
                 if not is_valid:
-                    app.logger.warning(f"Failed login attempt for email: {email}")
+                    app.logger.warning(
+                        "Failed login attempt for email: %s",
+                        email if email else "<empty>",
+                    )
+                    inc_login_failure("invalid_credentials")
                     return jsonify({"error": "invalid credentials"}), 401
 
         except Exception as e:
             app.logger.error(f"Database error in login: {str(e)}")
+            inc_db_error("login_select")
             return jsonify({"error": "An error occurred"}), 503
 
         token = _serializer().dumps(
@@ -212,6 +260,7 @@ def create_app():
     @require_auth
     def upload_document():
         if "file" not in request.files:
+            inc_suspicious("upload_missing_file_field")
             return jsonify({"error": "file is required (multipart/form-data)"}), 400
 
         file = request.files["file"]
@@ -225,8 +274,10 @@ def create_app():
 
         # Validate file type and MIME type
         if file.mimetype != "application/pdf":
+            inc_suspicious("upload_bad_mime")
             return jsonify({"error": "only PDF files are allowed"}), 415
         if not file.filename.lower().endswith(".pdf"):
+            inc_suspicious("upload_bad_extension")
             return jsonify({"error": "only PDF files are allowed"}), 415
 
         # Sanitize filename
@@ -284,23 +335,22 @@ def create_app():
                     {"id": did},
                 ).one()
         except Exception as e:
-            # Remove file if DB insert fails
             stored_path.unlink(missing_ok=True)
-            # Log error and return generic message
             app.logger.error(f"Database error: {str(e)}")
+            inc_db_error("insert_document")
             return jsonify({"error": "database error occurred"}), 503
 
-        return jsonify(
-            {
-                "id": int(row.id),
-                "name": row.name,
-                "creation": row.creation.isoformat()
-                if hasattr(row.creation, "isoformat")
-                else str(row.creation),
-                "sha256": row.sha256_hex,
-                "size": int(row.size),
-            }
-        ), 201
+        resp_data = {
+            "id": int(row.id),
+            "name": row.name,
+            "creation": row.creation.isoformat()
+            if hasattr(row.creation, "isoformat")
+            else str(row.creation),
+            "sha256": row.sha256_hex,
+            "size": int(row.size),
+        }
+        inc_upload(int(row.size))
+        return jsonify(resp_data), 201
 
     # GET /api/list-documents
     @app.get("/api/list-documents")
@@ -320,9 +370,8 @@ def create_app():
                     {"uid": int(g.user["id"])},
                 ).all()
         except Exception as e:
-            # Log the full error for debugging
             app.logger.error(f"Database error in list_documents: {str(e)}")
-            # Return generic error message
+            inc_db_error("list_documents")
             return jsonify({"error": "An error occurred while fetching documents"}), 503
 
         docs = [
@@ -383,9 +432,8 @@ def create_app():
                     {"did": document_id, "uid": int(g.user["id"])},
                 ).all()
         except Exception as e:
-            # Log the full error for debugging
             app.logger.error(f"Database error in list_versions: {str(e)}")
-            # Return generic error message
+            inc_db_error("list_versions")
             return jsonify({"error": "An error occurred while fetching versions"}), 503
 
         versions = [
@@ -428,9 +476,8 @@ def create_app():
             app.logger.error("Invalid user ID in auth token")
             return jsonify({"error": "Authentication error"}), 401
         except Exception as e:
-            # Log the full error for debugging
             app.logger.error(f"Database error in list_all_versions: {str(e)}")
-            # Return generic error message
+            inc_db_error("list_all_versions")
             return jsonify({"error": "An error occurred while fetching versions"}), 503
 
         versions = [
@@ -472,9 +519,8 @@ def create_app():
                     {"id": document_id, "uid": int(g.user["id"])},
                 ).first()
         except Exception as e:
-            # Log error and return generic message
             app.logger.error(f"Database error in get_document: {str(e)}")
-            # Return generic error message
+            inc_db_error("get_document")
             return jsonify(
                 {"error": "An error occurred while fetching the document"}
             ), 503
@@ -572,6 +618,7 @@ def create_app():
                 ).first()
         except Exception as e:
             app.logger.error("Database error in get_version: %s", e)
+            inc_db_error("get_version")
             return jsonify({"error": "database error"}), 503
 
         if not row:
@@ -691,9 +738,8 @@ def create_app():
                     {"id": doc_id, "owner": owner_id},
                 ).first()
         except Exception as e:
-            # Log error and return generic message
             app.logger.error("DB delete error for doc id=%s: %s", doc_id, e)
-            # Return generic error message
+            inc_db_error("delete_document_select")
             return jsonify({"error": "database error during delete"}), 503
 
         if not row:
@@ -735,9 +781,8 @@ def create_app():
                     {"id": doc_id, "owner": owner_id},
                 )
         except Exception as e:
-            # Log error but don’t mask file deletion status
             app.logger.error("DB delete error for doc id=%s: %s", doc_id, e)
-            # Return generic error message
+            inc_db_error("delete_document_delete")
             return jsonify({"error": "database error during delete"}), 503
 
         return jsonify(
@@ -909,19 +954,19 @@ def create_app():
                 )
                 vid = int(conn.execute(text("SELECT LAST_INSERT_ID()")).scalar())
         except Exception:
-            # best-effort cleanup if DB insert fails
             try:
                 dest_path.unlink(missing_ok=True)
             except Exception as cleanup_error:
-                # Log cleanup failure but don't mask the original error
                 app.logger.warning(
                     f"Failed to cleanup file {dest_path}: {cleanup_error}"
                 )
             app.logger.exception(
                 "Database error during version insert for document %s", doc_id
             )
+            inc_db_error("insert_version")
             return jsonify({"error": "database error during version insert"}), 503
 
+        inc_watermark_created(method)
         return jsonify(
             {
                 "id": vid,
@@ -1025,6 +1070,7 @@ def create_app():
                 "Error when attempting to read watermark for document %s: %s", doc_id, e
             )
             return jsonify({"error": "error when attempting to read watermark"}), 400
+        inc_watermark_read(method)
         return jsonify(
             {
                 "documentid": doc_id,
@@ -1033,6 +1079,21 @@ def create_app():
                 "position": position,
             }
         ), 201
+
+    def _is_authorized_metrics_request() -> bool:
+        token_required = os.environ.get("METRICS_TOKEN", "")
+        provided = request.headers.get("X-Metrics-Token", "")
+        if provided != token_required:
+            return False
+        return True
+
+    @app.get("/metrics")
+    def metrics():
+        if not _is_authorized_metrics_request():
+            # Obscure existence a bit – return 404 instead of 403 to casual scans
+            return jsonify({"error": "not found"}), 404
+        data = render_prometheus()
+        return Response(data, mimetype="text/plain; version=0.0.4")
 
     return app
 

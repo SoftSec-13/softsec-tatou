@@ -46,3 +46,12 @@ scrape_configs:
           referrer: ""
           agent: ""
           duration: ""
+      # Secondary parse for structured application line containing correlation id (CID=...)
+      - regex:
+          expression: 'CID=(?P<cid>[a-f0-9]{16}) METHOD='
+        # If present, cid will be extracted; absence is fine
+      - labels:
+          cid: ""
+
+# NOTE: Prometheus scrapes promtail itself (for promtail internal metrics) and the
+# server /metrics endpoint using docker-compose added prometheus.yml.
