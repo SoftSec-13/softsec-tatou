@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   server:
     build:
@@ -22,13 +20,14 @@ services:
       - DB_USER=${MARIADB_USER}
       - DB_PASSWORD=${MARIADB_PASSWORD}
       - PRIVKEY_PASSPHRASE=${PRIVKEY_PASSPHRASE}
+      - METRICS_TOKEN=${METRICS_TOKEN}
     depends_on:
       db:
         condition: service_healthy
     restart: unless-stopped
 
   db:
-    image: mariadb:11.4
+    image: mariadb:latest
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     environment:
       - MARIADB_ROOT_PASSWORD=${MARIADB_ROOT_PASSWORD}
@@ -49,7 +48,7 @@ services:
 
   # Monitoring
   loki:
-    image: grafana/loki:2.9.0
+    image: grafana/loki:latest
     container_name: loki
     command: -config.file=/etc/loki/local-config.yaml
     ports:
@@ -57,13 +56,29 @@ services:
     restart: unless-stopped
 
   promtail:
-    image: grafana/promtail:2.9.0
+    image: grafana/promtail:latest
     container_name: promtail
     volumes:
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./grafana/promtail-config.yaml:/etc/promtail/promtail-config.yaml
     command: -config.file=/etc/promtail/promtail-config.yaml
+    restart: unless-stopped
+
+  falco:
+    image: falcosecurity/falco:latest
+    container_name: falco
+    cap_drop:
+      - all
+    cap_add:
+      - sys_admin
+      - sys_resource
+      - sys_ptrace
+    volumes:
+      - /var/run/docker.sock:/host/var/run/docker.sock
+      - /proc:/host/proc:ro
+      - /etc:/host/etc:ro
+      - ./falco/tatou_rules.yaml:/etc/falco/rules.d/tatou_rules.yaml:ro
     restart: unless-stopped
 
   grafana:
@@ -75,6 +90,19 @@ services:
       - grafana-data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning
       - ./grafana/provisioning/dashboards:/var/lib/grafana/dashboards
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    volumes:
+      - ./grafana/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "127.0.0.1:9090:9090"
     restart: unless-stopped
 
 volumes:
