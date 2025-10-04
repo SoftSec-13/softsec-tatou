@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   server:
     image: ${DOCKERHUB_USER}/tatou:latest
