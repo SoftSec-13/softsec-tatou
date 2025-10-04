@@ -78,6 +78,7 @@ services:
       - /var/run/docker.sock:/host/var/run/docker.sock
       - /proc:/host/proc:ro
       - /etc:/host/etc:ro
+      - ./falco/tatou_rules.yaml:/etc/falco/rules.d/tatou_rules.yaml:ro
     restart: unless-stopped
 
   grafana:

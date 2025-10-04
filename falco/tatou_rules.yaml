@@ -1,28 +1,23 @@
-# Custom Falco rules tailored for the Tatou platform.
-# TODO DOES NOT WORK
-
 - list: tatou_sensitive_files
   items:
     - /app/server_priv.asc
-    - /app/server_pub.asc
-    - /app/storage/flag.txt
+    - /app/flag
+    - /home/lab/softsec-tatou/flag
 
-- rule: Tatou Sensitive File Read Outside API
-  desc: Detect access to Tatou private keys and flag files from containers other than the Flask API.
+- rule: Tatou Sensitive file was read
+  desc: Detect access to Tatou private keys and flag files.
   condition: >
-    open_read and container and fd.name in (tatou_sensitive_files) and
-    not (container.name contains "server")
-  output: "Tatou sensitive file read by container=%container.name user=%user.name cmd=%proc.cmdline file=%fd.name"
+    (open_read and container and fd.name in (tatou_sensitive_files)) or (open_read and not container and fd.name in (tatou_sensitive_files))
+  output: >
+    Tatou sensitive file read |
+    file=%fd.name user=%user.name user_uid=%user.uid process=%proc.name proc_exepath=%proc.exepath parent=%proc.pname command=%proc.cmdline terminal=%proc.tty
   priority: WARNING
-  tags: [tatou, container, credential_access]
-  source: syscall
 
-- rule: Tatou Storage Write Outside API
-  desc: Detect writes to the shared storage volume by non-API containers.
+- rule: Tatou Sensitive file was tampered with
+  desc: Detect writes to Tatou private keys or flag files.
   condition: >
-    open_write and container and fd.name startswith "/app/storage" and
-    not (container.name contains "server")
-  output: "Tatou storage write by container=%container.name user=%user.name cmd=%proc.cmdline file=%fd.name"
+    open_write and container and fd.name in (tatou_sensitive_files)
+  output: >
+    Tatou sensitive file write |
+    file=%fd.name user=%user.name user_uid=%user.uid process=%proc.name proc_exepath=%proc.exepath parent=%proc.pname command=%proc.cmdline terminal=%proc.tty
   priority: CRITICAL
-  tags: [tatou, container, integrity]
-  source: syscall
