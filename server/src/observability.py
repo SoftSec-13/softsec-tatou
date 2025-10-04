@@ -65,18 +65,14 @@ class HistogramMetric:
         if len(label_values) != len(self.label_names):
             raise ValueError("Label cardinality mismatch")
         labels = tuple(label_values)
-        # increment buckets
-        placed = False
+        # Increment every bucket whose upper bound is >= value so that
+        # stored counts are already cumulative (Prometheus expectation).
         for b in self.buckets:
             if value <= b:
                 self.counts[(labels, b)] = self.counts.get((labels, b), 0) + 1
-                placed = True
-        # Always increment +Inf
+        # Always increment +Inf bucket count
         inf_key = (labels, float("inf"))
         self.counts[inf_key] = self.counts.get(inf_key, 0) + 1
-        if not placed:
-            # value was greater than all buckets, only +Inf updated above
-            pass
         self.sums[labels] = self.sums.get(labels, 0.0) + value
 
     def render(self) -> str:
@@ -86,26 +82,22 @@ class HistogramMetric:
         # <name>_sum{...} <sum>
         # <name>_count{...} <total>
         lines = [f"# HELP {self.name} {self.help}", f"# TYPE {self.name} histogram"]
-        # Group by label set
         label_sets = sorted({lbl for (lbl, _le) in self.counts.keys()})
         for labels in label_sets:
-            cumulative = 0
-            for b in self.buckets + (float("inf"),):
-                c = self.counts.get((labels, b), 0)
-                cumulative = c  # counts stored as cumulative already for <= logic
-                b_label = "+Inf" if b == float("inf") else repr(b)
-                label_frag = ",".join(
-                    f"{k}={_quote(v)}"
-                    for k, v in zip(self.label_names, labels, strict=True)
-                )
-                lines.append(
-                    f"{self.name}_bucket{{{label_frag},le={_quote(b_label)}}}"
-                    f" {cumulative}"
-                )
-            total = self.counts.get((labels, float("inf")), 0)
             label_frag = ",".join(
                 f"{k}={_quote(v)}"
                 for k, v in zip(self.label_names, labels, strict=True)
+            )
+            # Emit stored cumulative counts for each finite bucket
+            for b in self.buckets:
+                c = self.counts.get((labels, b), 0)
+                lines.append(
+                    f"{self.name}_bucket{{{label_frag},le={_quote(repr(b))}}} {c}"
+                )
+            # +Inf bucket / total
+            total = self.counts.get((labels, float("inf")), 0)
+            lines.append(
+                f"{self.name}_bucket{{{label_frag},le={_quote('+Inf')}}} {total}"
             )
             lines.append(
                 f"{self.name}_sum{{{label_frag}}} {self.sums.get(labels, 0.0)}"
@@ -135,6 +127,18 @@ REQUEST_LATENCY = HistogramMetric(
     counts={},
     sums={},
 )
+INFLIGHT = CounterMetric(
+    name="tatou_http_requests_in_progress_total",
+    help="In-flight HTTP requests (increment at start, decrement at end)",
+    label_names=("route",),
+    values={},
+)
+LOGIN_SUCCESSES = CounterMetric(
+    name="tatou_login_successes_total",
+    help="Successful logins",
+    label_names=(),
+    values={},
+)
 LOGIN_FAILURES = CounterMetric(
     name="tatou_login_failures_total",
     help="Number of failed login attempts",
@@ -145,6 +149,12 @@ WATERMARK_CREATED = CounterMetric(
     name="tatou_watermarks_created_total",
     help="Watermarks created",
     label_names=("method",),
+    values={},
+)
+WATERMARK_FAILED = CounterMetric(
+    name="tatou_watermarks_failed_total",
+    help="Watermarking operations that raised an error",
+    label_names=("method", "stage"),
     values={},
 )
 WATERMARK_READ = CounterMetric(
@@ -177,17 +187,60 @@ DB_ERRORS = CounterMetric(
     label_names=("operation",),
     values={},
 )
+DB_QUERY_LATENCY = HistogramMetric(
+    name="tatou_db_query_duration_seconds",
+    help="Duration of DB operations (best-effort manual instrumentation)",
+    label_names=("operation",),
+    buckets=(0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5),
+    counts={},
+    sums={},
+)
+WATERMARK_LATENCY = HistogramMetric(
+    name="tatou_watermark_duration_seconds",
+    help="Duration of watermark application per method",
+    label_names=("method",),
+    buckets=(0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10),
+    counts={},
+    sums={},
+)
+REQUEST_BODY_SIZE = HistogramMetric(
+    name="tatou_http_request_body_bytes",
+    help="Request body sizes in bytes (Content-Length if present)",
+    label_names=("method", "route"),
+    buckets=(
+        100,
+        500,
+        1_000,
+        5_000,
+        10_000,
+        50_000,
+        100_000,
+        500_000,
+        1_000_000,
+        5_000_000,
+        25_000_000,
+        50_000_000,
+    ),
+    counts={},
+    sums={},
+)
 
 _ALL = [
     REQUESTS,
     REQUEST_LATENCY,
+    INFLIGHT,
+    LOGIN_SUCCESSES,
     LOGIN_FAILURES,
     WATERMARK_CREATED,
+    WATERMARK_FAILED,
     WATERMARK_READ,
     UPLOADS,
     UPLOAD_BYTES,
     SUSPICIOUS,
     DB_ERRORS,
+    DB_QUERY_LATENCY,
+    WATERMARK_LATENCY,
+    REQUEST_BODY_SIZE,
 ]
 
 
@@ -195,11 +248,32 @@ def record_request(method: str, route: str, status: int, duration: float) -> Non
     with _lock:
         REQUESTS.inc(method, route, str(status))
         REQUEST_LATENCY.observe(duration, method, route)
+        # decrement in-flight if previously incremented
+        key = (route,)
+        if INFLIGHT.values.get(key):
+            INFLIGHT.values[key] -= 1
+
+
+def inc_inflight(route: str) -> None:
+    with _lock:
+        INFLIGHT.inc(route)
+
+
+def observe_request_size(method: str, route: str, size: int | None) -> None:
+    if size is None or size < 0:
+        return
+    with _lock:
+        REQUEST_BODY_SIZE.observe(float(size), method, route)
 
 
 def inc_login_failure(reason: str) -> None:
     with _lock:
         LOGIN_FAILURES.inc(reason)
+
+
+def inc_login_success() -> None:
+    with _lock:
+        LOGIN_SUCCESSES.inc()
 
 
 def inc_watermark_created(method: str) -> None:
@@ -210,6 +284,16 @@ def inc_watermark_created(method: str) -> None:
 def inc_watermark_read(method: str) -> None:
     with _lock:
         WATERMARK_READ.inc(method)
+
+
+def inc_watermark_failed(method: str, stage: str) -> None:
+    with _lock:
+        WATERMARK_FAILED.inc(method, stage)
+
+
+def observe_watermark_duration(method: str, duration: float) -> None:
+    with _lock:
+        WATERMARK_LATENCY.observe(duration, method)
 
 
 def inc_upload(size: int) -> None:
@@ -226,6 +310,11 @@ def inc_suspicious(reason: str) -> None:
 def inc_db_error(op: str) -> None:
     with _lock:
         DB_ERRORS.inc(op)
+
+
+def observe_db_latency(op: str, duration: float) -> None:
+    with _lock:
+        DB_QUERY_LATENCY.observe(duration, op)
 
 
 def render_prometheus() -> str:

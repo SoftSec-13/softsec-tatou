@@ -16,11 +16,17 @@ from werkzeug.utils import secure_filename
 import watermarking_utils as WMUtils
 from observability import (
     inc_db_error,
+    inc_inflight,
     inc_login_failure,
+    inc_login_success,
     inc_suspicious,
     inc_upload,
     inc_watermark_created,
+    inc_watermark_failed,
     inc_watermark_read,
+    observe_db_latency,
+    observe_request_size,
+    observe_watermark_duration,
     record_request,
     render_prometheus,
 )
@@ -117,6 +123,15 @@ def create_app():
     def _tatou_before():
         try:  # record start for latency
             request._tatou_start = time.time()  # type: ignore[attr-defined]
+            route = request.url_rule.rule if request.url_rule else request.path
+            inc_inflight(route)
+            # capture request size if content-length header present
+            try:
+                cl = request.content_length
+                if cl is not None:
+                    observe_request_size(request.method, route, cl)
+            except Exception as exc:  # pragma: no cover - soft fail
+                app.logger.error("request size capture failed: %s", exc)
         except Exception as exc:  # pragma: no cover - defensive
             app.logger.error("before_request instrumentation failed: %s", exc)
 
@@ -172,6 +187,7 @@ def create_app():
         email = (payload.get("email") or "").strip().lower()
         login = (payload.get("login") or "").strip()
         password = payload.get("password") or ""
+        start_db = time.time()
         if not email or not login or not password:
             return jsonify({"error": "email, login, and password are required"}), 400
 
@@ -195,6 +211,7 @@ def create_app():
                     text("SELECT id, email, login FROM Users WHERE id = :id"),
                     {"id": uid},
                 ).one()
+            observe_db_latency("create_user", time.time() - start_db)
         except IntegrityError:
             return jsonify({"error": "email or login already exists"}), 409
         except Exception as e:
@@ -213,6 +230,7 @@ def create_app():
         if not email or not password:
             return jsonify({"error": "email and password are required"}), 400
 
+        start_db = time.time()
         try:
             with get_engine().connect() as conn:
                 row = conn.execute(
@@ -244,9 +262,11 @@ def create_app():
             inc_db_error("login_select")
             return jsonify({"error": "An error occurred"}), 503
 
+        observe_db_latency("login_select", time.time() - start_db)
         token = _serializer().dumps(
             {"uid": int(row.id), "login": row.login, "email": row.email}
         )
+        inc_login_success()
         return jsonify(
             {
                 "token": token,
@@ -267,6 +287,7 @@ def create_app():
         if not file or file.filename == "":
             return jsonify({"error": "empty filename"}), 400
 
+        start_db = time.time()
         # Validate file size
         MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
         if file.content_length > MAX_FILE_SIZE:
@@ -340,6 +361,7 @@ def create_app():
             inc_db_error("insert_document")
             return jsonify({"error": "database error occurred"}), 503
 
+        observe_db_latency("insert_document", time.time() - start_db)
         resp_data = {
             "id": int(row.id),
             "name": row.name,
@@ -878,8 +900,10 @@ def create_app():
                 method=method, pdf=str(file_path), position=position
             )
             if applicable is False:
+                inc_watermark_failed(method, "applicability")
                 return jsonify({"error": "watermarking method not applicable"}), 400
         except Exception as e:
+            inc_watermark_failed(method, "applicability_exception")
             app.logger.exception(
                 "Watermark applicability check failed for document %s", e
             )
@@ -887,6 +911,7 @@ def create_app():
 
         # apply watermark → bytes
         try:
+            _wm_start = time.time()
             wm_bytes: bytes = WMUtils.apply_watermark(
                 pdf=str(file_path),
                 secret=secret,
@@ -895,9 +920,12 @@ def create_app():
                 intended_for=intended_for,
                 position=position,
             )
-            if not isinstance(wm_bytes, bytes | bytearray) or len(wm_bytes) == 0:
+            observe_watermark_duration(method, time.time() - _wm_start)
+            if not isinstance(wm_bytes, (bytes | bytearray)) or len(wm_bytes) == 0:
+                inc_watermark_failed(method, "empty_output")
                 return jsonify({"error": "watermarking produced no output"}), 500
         except Exception as e:
+            inc_watermark_failed(method, "exception")
             app.logger.exception(
                 "Watermarking failed for document %s using method %s: %s",
                 doc_id,
