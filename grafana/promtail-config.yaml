@@ -1,21 +1,3 @@
-# server:
-#   http_listen_port: 9080
-#   grpc_listen_port: 0
-
-# positions:
-#   filename: /tmp/positions.yaml
-
-# clients:
-#   - url: http://loki:3100/loki/api/v1/push
-
-# scrape_configs:
-#   - job_name: docker
-#     docker_sd_configs:
-#       - host: unix:///var/run/docker.sock
-#     relabel_configs:
-#       - source_labels: [__meta_docker_container_name]
-#         target_label: container
-
 server:
   http_listen_port: 9080
   grpc_listen_port: 0
@@ -35,37 +17,36 @@ scrape_configs:
         target_label: container
 
     pipeline_stages:
-      - match:
-          selector: '{container=~".*server.*"}'
-          stages:
-            - regex:
-                expression: '^(?P<client_ip>\S+) \S+ \S+ \[(?P<time>[^\]]+)\] "(?P<method>\S+) (?P<path>\S+) \S+" (?P<status>\d+) (?P<size>\d+) "(?P<referrer>[^"]*)" "(?P<agent>[^"]*)" (?P<duration>[\d\.]+)'
-            - labels:
-                client_ip: ""
-                method: ""
-                path: ""
-                status: ""
-                size: ""
-                referrer: ""
-                agent: ""
-                duration: ""
-            # Secondary parse for structured application line containing correlation id (CID=...)
-            - regex:
-                expression: 'CID=(?P<cid>[a-f0-9]{16}) METHOD='
-            - labels:
-                cid: ""
-      - match:
-          selector: '{container=~".*falco.*"}'
-          stages:
-            - regex:
-                expression: '^(?P<time>\S+) (?P<priority>\S+) (?P<rule>\S+) (?P<source>\S+) (?P<user>\S+) (?P<process>\S+) (?P<target_container>\S+)' # TODO: improve regex to capture more fields
-            - labels:
-                falco_priority: priority
-                falco_rule: rule
-                falco_source: source
-                falco_actor: user
-                falco_process: process
-                falco_target_container: target_container
-
-# NOTE: Prometheus scrapes promtail itself (for promtail internal metrics) and the
-# server /metrics endpoint using docker-compose added prometheus.yml.
+      - regex:
+          expression: '^(?P<client_ip>\S+) \S+ \S+ \[(?P<time>[^\]]+)\] "(?P<method>\S+) (?P<path>\S+) \S+" (?P<status>\d+) (?P<size>\d+) "(?P<referrer>[^"]*)" "(?P<agent>[^"]*)" (?P<duration>[\d\.]+)'
+      - labels:
+          client_ip: ""
+          method: ""
+          path: ""
+          status: ""
+          size: ""
+          referrer: ""
+          agent: ""
+          duration: ""
+      - regex:
+          expression: '^(?P<time>\S+): (?P<priority>\w+) (?P<rule>[^|]+?) \|(?:(?:.*?file=(?P<file>\S+))?)?(?:(?:.*?evt_type=(?P<evt_type>\S+))?)?(?:(?:.*?user=(?P<user>\S+))?)?(?:(?:.*?user_uid=(?P<user_uid>-?\d+))?)?(?:(?:.*?process=(?P<process>\S+))?)?(?:(?:.*?proc_exepath=(?P<proc_exepath>\S+))?)?(?:(?:.*?parent=(?P<parent>\S+))?)?(?:(?:.*?command=(?P<command>[^\n]*?)(?:\sterminal=|$))?)?(?:(?:.*?terminal=(?P<terminal>\d+))?)?(?:(?:.*?container_id=(?P<container_id>\S+))?)?(?:(?:.*?container_name=(?P<container_name>\S+))?)?(?:(?:.*?container_image_repository=(?P<container_image_repository>\S*))?)?(?:(?:.*?container_image_tag=(?P<container_image_tag>\S*))?)?(?:(?:.*?exe_flags=(?P<exe_flags>\S+))?).*$'
+      - labels:
+          falco_priority: priority
+          falco_rule: rule
+          falco_file: file
+          falco_evt_type: evt_type
+          falco_user: user
+          falco_user_uid: user_uid
+          falco_process: process
+          falco_parent: parent
+          falco_proc_exe: proc_exepath
+          falco_command: command
+          falco_terminal: terminal
+          falco_container_id: container_id
+          falco_container_name: container_name
+          falco_image_repo: container_image_repository
+          falco_image_tag: container_image_tag
+          falco_exe_flags: exe_flags
+      - timestamp:
+          source: time
+          format: RFC3339Nano
