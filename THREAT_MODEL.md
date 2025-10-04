@@ -1,7 +1,7 @@
 # Tatou Platform Threat Model
 
 Date: 2025-10-03
-Scope: Deployed PDF watermarking service (Flask API + MariaDB + watermarking methods + RMAP flow) with added observability (Prometheus style metrics via /metrics, Loki/Promtail/Grafana log aggregation).
+Scope: Deployed PDF watermarking service (Flask API + MariaDB + watermarking methods + RMAP flow) with added observability (Prometheus style metrics via /metrics, Loki/Promtail/Grafana log aggregation, Falco runtime security).
 
 ## 1. Assets
 - User credentials (email, password hash)
@@ -11,6 +11,7 @@ Scope: Deployed PDF watermarking service (Flask API + MariaDB + watermarking met
 - Watermark secrets embedded inside PDFs
 - Source code & watermarking method implementations
 - Logging & telemetry data (may contain metadata, IPs)
+- Falco runtime alerts and custom rule definitions (sensitive operational intel)
 
 ## 2. Trust Boundaries
 - Internet client -> Flask HTTP interface
@@ -18,6 +19,7 @@ Scope: Deployed PDF watermarking service (Flask API + MariaDB + watermarking met
 - Flask app -> Filesystem storage directory
 - RMAP handshake (untrusted payloads) -> internal watermarking subsystem
 - Metrics/Logs (read-only by monitoring stack) -> Grafana viewers
+- Container runtime/syscalls -> Falco sensor (privileged host visibility)
 
 ## 3. Actors
 - Legitimate end users (registered accounts)
@@ -25,6 +27,7 @@ Scope: Deployed PDF watermarking service (Flask API + MariaDB + watermarking met
 - Opportunistic attacker (no auth)
 - Authenticated but malicious user (insider threat) trying to escalate / pivot
 - Automated scanners / bots probing endpoints
+- Security analyst monitoring metrics/logs/Falco alerts (defender)
 
 ## 4. Entry Points / Attack Surface
 - REST endpoints: /api/*, /rmap-initiate, /rmap-get-link, /api/get-version/<link>
@@ -33,6 +36,7 @@ Scope: Deployed PDF watermarking service (Flask API + MariaDB + watermarking met
 - RMAP base64 JSON payloads
 - Token-based auth (Authorization: Bearer ...)
 - Static file serving for index and assets
+- Docker socket mounts for monitoring agents (Falco, Promtail)
 
 ## 5. Threat Enumeration (STRIDE)
 | Category | Threat | Notes / Impact | Mitigations / Detection |
@@ -46,6 +50,7 @@ Scope: Deployed PDF watermarking service (Flask API + MariaDB + watermarking met
 | DoS | Crafted PDFs causing heavy processing | CPU load | Metrics on watermark creation count; (future: add duration per method) |
 | Elevation of Privilege | SQL injection through parameters | DB compromise | Parameterized SQL; detect DB errors (db_error counters) |
 | Elevation of Privilege | Method selection to unsafe method | Execute arbitrary code | Unsafe method excluded from registry; metrics may show unexpected method name attempts (future enhancement) |
+| Elevation of Privilege | Container breakout via interactive shell / docker socket abuse | Host or other containers compromised | Falco alerts on shells, socket tampering (falco_rule label), Grafana panel for triage |
 | Abuse | Brute force login | Account compromise | login failure counter + warning logs; alert on threshold |
 | Abuse | RMAP secret guessing (/api/get-version/<link>) | Retrieve watermarked PDFs | 32/64 hex tokens high entropy; monitor 404 rate & distribution |
 
@@ -57,6 +62,7 @@ Scope: Deployed PDF watermarking service (Flask API + MariaDB + watermarking met
 5. Watermark created/read counters (method label) – detect anomalous method usage.
 6. Suspicious events (rejected uploads / validation issues) – early probing signal.
 7. Access logs (via Promtail regex) – per-status distribution, client IP.
+8. Falco runtime alerts (Loki stream `falco_rule`) – container breakout / tampering detection.
 
 ## 7. Gaps / Future Work
 - No correlation ID per request (could add X-Request-ID header).
@@ -64,6 +70,7 @@ Scope: Deployed PDF watermarking service (Flask API + MariaDB + watermarking met
 - Metrics not aggregated across gunicorn workers (needs multi-process or external exporter).
 - No anomaly alerting rules yet (Grafana alerting could be added).
 - Secrets in memory not redacted from debug tracebacks (intentionally permissive for course).
+- Falco alerts require manual review; need threshold-based alerting and noise-tuning of custom rules.
 
 ## 8. Abuse Cases & Detection Strategy
 | Abuse Case | Signal | Metric / Log | Threshold (example) |
@@ -74,9 +81,10 @@ Scope: Deployed PDF watermarking service (Flask API + MariaDB + watermarking met
 | Storage flood | Upload bytes spike | tatou_upload_bytes_total derivative | >2x baseline in 10m |
 | Watermark abuse / enumeration | High watermark read vs create ratio | tatou_watermarks_read_total / tatou_watermarks_created_total | >10:1 sustained |
 | SQL injection attempts | DB error spike | tatou_db_errors_total | > baseline + 3σ |
+| Container breakout attempt | Falco rule trigger (e.g. Terminal shell, Tatou storage write) | Loki `{falco_rule!=""}` stream | Any high-priority alert |
 
 ## 9. Residual Risk
-Given academic scope, residual risks (token theft, DoS) accepted. Logging + metrics now provide visibility for detection & manual response.
+Given academic scope, residual risks (token theft, DoS) remain accepted. Logging, metrics, and Falco runtime alerts provide richer detection, but Falco runs privileged and depends on timely rule/driver updates to avoid becoming a liability.
 
 ---
 Generated as part of operational security instrumentation task.

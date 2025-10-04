@@ -35,23 +35,37 @@ scrape_configs:
         target_label: container
 
     pipeline_stages:
-      - regex:
-          expression: '^(?P<client_ip>\S+) \S+ \S+ \[(?P<time>[^\]]+)\] "(?P<method>\S+) (?P<path>\S+) \S+" (?P<status>\d+) (?P<size>\d+) "(?P<referrer>[^"]*)" "(?P<agent>[^"]*)" (?P<duration>[\d\.]+)'
-      - labels:
-          client_ip: ""
-          method: ""
-          path: ""
-          status: ""
-          size: ""
-          referrer: ""
-          agent: ""
-          duration: ""
-      # Secondary parse for structured application line containing correlation id (CID=...)
-      - regex:
-          expression: 'CID=(?P<cid>[a-f0-9]{16}) METHOD='
-        # If present, cid will be extracted; absence is fine
-      - labels:
-          cid: ""
+      - match:
+          selector: '{container=~".*server.*"}'
+          stages:
+            - regex:
+                expression: '^(?P<client_ip>\S+) \S+ \S+ \[(?P<time>[^\]]+)\] "(?P<method>\S+) (?P<path>\S+) \S+" (?P<status>\d+) (?P<size>\d+) "(?P<referrer>[^"]*)" "(?P<agent>[^"]*)" (?P<duration>[\d\.]+)'
+            - labels:
+                client_ip: ""
+                method: ""
+                path: ""
+                status: ""
+                size: ""
+                referrer: ""
+                agent: ""
+                duration: ""
+            # Secondary parse for structured application line containing correlation id (CID=...)
+            - regex:
+                expression: 'CID=(?P<cid>[a-f0-9]{16}) METHOD='
+            - labels:
+                cid: ""
+      - match:
+          selector: '{container=~".*falco.*"}'
+          stages:
+            - regex:
+                expression: '^(?P<time>\S+) (?P<priority>\S+) (?P<rule>\S+) (?P<source>\S+) (?P<user>\S+) (?P<process>\S+) (?P<target_container>\S+)' # TODO: improve regex to capture more fields
+            - labels:
+                falco_priority: priority
+                falco_rule: rule
+                falco_source: source
+                falco_actor: user
+                falco_process: process
+                falco_target_container: target_container
 
 # NOTE: Prometheus scrapes promtail itself (for promtail internal metrics) and the
 # server /metrics endpoint using docker-compose added prometheus.yml.

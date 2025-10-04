@@ -1,0 +1,28 @@
+# Custom Falco rules tailored for the Tatou platform.
+# TODO DOES NOT WORK
+
+- list: tatou_sensitive_files
+  items:
+    - /app/server_priv.asc
+    - /app/server_pub.asc
+    - /app/storage/flag.txt
+
+- rule: Tatou Sensitive File Read Outside API
+  desc: Detect access to Tatou private keys and flag files from containers other than the Flask API.
+  condition: >
+    open_read and container and fd.name in (tatou_sensitive_files) and
+    not (container.name contains "server")
+  output: "Tatou sensitive file read by container=%container.name user=%user.name cmd=%proc.cmdline file=%fd.name"
+  priority: WARNING
+  tags: [tatou, container, credential_access]
+  source: syscall
+
+- rule: Tatou Storage Write Outside API
+  desc: Detect writes to the shared storage volume by non-API containers.
+  condition: >
+    open_write and container and fd.name startswith "/app/storage" and
+    not (container.name contains "server")
+  output: "Tatou storage write by container=%container.name user=%user.name cmd=%proc.cmdline file=%fd.name"
+  priority: CRITICAL
+  tags: [tatou, container, integrity]
+  source: syscall
