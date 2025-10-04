@@ -31,7 +31,7 @@ scrape_configs:
       - regex:
           expression: '^(?P<time>\S+): (?P<priority>\w+) (?P<rule>[^|]+?) \|(?:(?:.*?file=(?P<file>\S+))?)?(?:(?:.*?evt_type=(?P<evt_type>\S+))?)?(?:(?:.*?user=(?P<user>\S+))?)?(?:(?:.*?user_uid=(?P<user_uid>-?\d+))?)?(?:(?:.*?process=(?P<process>\S+))?)?(?:(?:.*?proc_exepath=(?P<proc_exepath>\S+))?)?(?:(?:.*?parent=(?P<parent>\S+))?)?(?:(?:.*?command=(?P<command>[^\n]*?)(?:\sterminal=(?P<terminal>\d+)|$))?)?(?:(?:.*?container_id=(?P<container_id>\S+))?)?(?:(?:.*?container_name=(?P<container_name>\S+))?)?(?:(?:.*?container_image_repository=(?P<container_image_repository>\S*))?)?(?:(?:.*?container_image_tag=(?P<container_image_tag>\S*))?)?(?:(?:.*?exe_flags=(?P<exe_flags>\S+))?).*$'
       - labels:
-          falco_priority: priority
+          level: priority
           falco_rule: rule
           falco_file: file
           falco_evt_type: evt_type
@@ -50,3 +50,7 @@ scrape_configs:
       - timestamp:
           source: time
           format: RFC3339Nano
+      - regex:
+          expression: '^(?P<time>[^\]]+)\s\d\s\[(?P<db_level>\w+)\]'
+      - labels:
+          level: db_level
