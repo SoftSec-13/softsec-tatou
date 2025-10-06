@@ -41,7 +41,7 @@ if not os.environ.get("TATOU_TEST_DISABLE_RMAP"):
         RMAPHandler = None  # type: ignore
 
 
-def create_app():
+def create_app(testing=False):
     app = Flask(__name__)
 
     # --- Config ---
@@ -58,6 +58,7 @@ def create_app():
     app.config["DB_NAME"] = os.environ.get("DB_NAME", "tatou")
 
     app.config["STORAGE_DIR"].mkdir(parents=True, exist_ok=True)
+    app.config["TESTING"] = testing
 
     # --- DB engine only (no Table metadata) ---
     def db_url() -> str:
@@ -90,6 +91,9 @@ def create_app():
     def require_auth(f):
         @wraps(f)
         def wrapper(*args, **kwargs):
+            if app.config['TESTING']:
+                g.user = {"id": 1, "login": "username", "email": "user@email.se"}
+                return f(*args, **kwargs)
             auth = request.headers.get("Authorization", "")
             if not auth.startswith("Bearer "):
                 return _auth_error("Missing or invalid Authorization header")
@@ -110,6 +114,8 @@ def create_app():
             return f(*args, **kwargs)
 
         return wrapper
+
+    app.require_auth = require_auth #Needed to mock authentication in testing
 
     def _sha256_file(path: Path) -> str:
         h = hashlib.sha256()
