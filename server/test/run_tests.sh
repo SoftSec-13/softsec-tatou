@@ -9,5 +9,11 @@ export DB_PASSWORD=tatou
 export DB_NAME=tatou
 export TOKEN_TTL_SECONDS=3600
 
+set DB_HOST=127.0.0.1
+set DB_USER=tatou
+set DB_PASSWORD=tatou
+set DB_NAME=tatou
+set TOKEN_TTL_SECONDS=3600
+
 sleep 10
 python -m pytest -vv test_api.py
