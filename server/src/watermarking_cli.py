@@ -125,6 +125,7 @@ def cmd_embed(args: argparse.Namespace) -> int:
         pdf=args.input,
         secret=secret,
         key=key,
+        intended_for=args.intended_for,
         position=args.position,
     )
     with open(args.output, "wb") as fh:
