@@ -74,6 +74,7 @@ class TestAllWatermarkingMethods:
         impl: WatermarkingMethod,
         sample_pdf_path: Path,
         secret: str,
+        intended_for: str,
         key: str,
     ):
         wm_impl = _as_instance(impl)
@@ -81,7 +82,11 @@ class TestAllWatermarkingMethods:
             pytest.skip(f"{method_name}: not applicable to the sample PDF")
         original = sample_pdf_path.read_bytes()
         out_bytes = wm_impl.add_watermark(
-            sample_pdf_path, secret=secret, key=key, position=None
+            sample_pdf_path,
+            secret=secret,
+            key=key,
+            intended_for=intended_for,
+            position=None,
         )
         assert isinstance(out_bytes, bytes | bytearray), (  # nosec B101
             f"{method_name}: add_watermark must return bytes"
@@ -99,6 +104,7 @@ class TestAllWatermarkingMethods:
         impl: WatermarkingMethod,
         sample_pdf_path: Path,
         secret: str,
+        intended_for: str,
         key: str,
         tmp_path: Path,
     ):
@@ -108,7 +114,11 @@ class TestAllWatermarkingMethods:
         out_pdf = tmp_path / f"{method_name}_watermarked.pdf"
         out_pdf.write_bytes(
             wm_impl.add_watermark(
-                sample_pdf_path, secret=secret, key=key, position=None
+                sample_pdf_path,
+                secret=secret,
+                key=key,
+                intended_for=intended_for,
+                position=None,
             )
         )
         extracted = wm_impl.read_secret(out_pdf, key=key)

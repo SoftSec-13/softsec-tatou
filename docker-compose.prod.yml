@@ -1,16 +1,12 @@
 services:
   server:
-    build:
-      context: server
-      dockerfile: Dockerfile
-      args:
-        GITHUB_TOKEN: ${GITHUB_TOKEN}
+    image: ${DOCKERHUB_USER}/tatou:latest
     ports:
       - "5000:5000"
     volumes:
       - user-files:/app/storage
-      - ./server/src/server_priv.asc:/app/server_priv.asc:ro
-      - ./server/src/server_pub.asc:/app/server_pub.asc:ro
+      - ./server/src/server_priv.asc:/app/src/server_priv.asc:ro
+      - ./server/src/server_pub.asc:/app/src/server_pub.asc:ro
     environment:
       - PYTHONUNBUFFERED=1
       # DB connection details for future use by the API
@@ -25,6 +21,8 @@ services:
       db:
         condition: service_healthy
     restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
 
   db:
     image: mariadb:latest
@@ -104,6 +102,19 @@ services:
     ports:
       - "127.0.0.1:9090:9090"
     restart: unless-stopped
+
+  watchtower:
+    image: containrrr/watchtower:latest
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_LABEL_ENABLE=true
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_ROLLING_RESTART=true
+      - REPO_USER=${DOCKERHUB_USER}
+      - REPO_PASS=${DOCKERHUB_PASSWORD}
+    command: --interval 300
 
 volumes:
   db-data:

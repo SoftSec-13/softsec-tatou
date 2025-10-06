@@ -6,15 +6,26 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# Install git for pip to clone repositories
+RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+
 # Copy project description, to instal dependencies
 COPY pyproject.toml /app/pyproject.toml
 
-# Install runtime dependencies
-RUN pip install --no-cache-dir -e .
+# Install runtime dependencies with authentication
+ARG GITHUB_TOKEN
+RUN if [ -n "$GITHUB_TOKEN" ]; then \
+        git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"; \
+    fi && \
+    pip install --no-cache-dir -e .
 
 # Copy sources after dependencies installation
 COPY src /app/src
 COPY flag /app/flag
+
+# Copy PGP keys for RMAP authentication
+COPY public-keys/ /app/public-keys/
+
 RUN pip install --no-cache-dir -e .
 
 EXPOSE 5000

@@ -1,3 +1,13 @@
+# Ignore pdfs
+*.pdf
+
+# Ignore debug files
+.vscode/
+
+# Ignore keys
+server/src/server_pub.asc
+server/src/server_priv.asc
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -206,3 +216,4 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+private_key_group_13.asc
