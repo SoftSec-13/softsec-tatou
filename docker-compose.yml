@@ -26,6 +26,23 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  fuzzer:
+    build:
+      context: ./server
+      dockerfile: fuzz/Dockerfile
+      args:
+        GITHUB_TOKEN: ${GITHUB_TOKEN}
+    working_dir: /app
+    environment:
+      - PYTHONUNBUFFERED=1
+      - FUZZ_WORKERS=${FUZZ_WORKERS:-0}
+      - FUZZ_COLLECT_COVERAGE=${FUZZ_COLLECT_COVERAGE:-1}
+      - FUZZ_TIME=${FUZZ_TIME:-300}
+      - MAX_LEN=${MAX_LEN:-5000}
+    volumes:
+      - ./server:/app
+    command: ["bash", "-lc", "./fuzz/scripts/run_fuzzing_suite.sh"]
+
   db:
     image: mariadb:latest
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci

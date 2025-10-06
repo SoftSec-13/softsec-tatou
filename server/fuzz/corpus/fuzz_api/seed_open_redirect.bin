@@ -1,0 +1,1 @@
+{"email": "//evil.com", "password": "https://evil.com", "login": "javascript:alert(1)", "intended_for": "http://127.0.0.1/admin"}

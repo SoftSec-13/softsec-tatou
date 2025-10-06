@@ -1,0 +1,1 @@
+{"email": "; ls -la", "password": "| whoami", "login": "&& cat /etc/passwd", "filename": "$(cat /etc/shadow)"}

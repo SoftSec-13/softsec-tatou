@@ -1,0 +1,1 @@
+{"email": "{{7*7}}", "password": "${7*7}", "login": "#{7*7}", "intended_for": "{{config.items()}}"}

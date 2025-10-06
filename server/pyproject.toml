@@ -2,7 +2,7 @@
 name = "Tatou-Server"
 version = "0.0.1"
 description = "PDF Watermarking platform"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 dependencies = [
 	"PyMuPDF>=1.21.1",
 	"Flask>=3.0.3",
@@ -25,7 +25,9 @@ dev = [
     "bandit>=1.7.5",
     "sqlfluff>=3.0.0",
     "requests",
-    "types-requests>=2.28.11"
+    "types-requests>=2.28.11",
+    "coverage>=7.5.0",
+    "hypothesis>=6.100.0"
 ]
 
 [tool.pytest.ini_options]
@@ -39,7 +41,7 @@ pdfwm = "watermarking_cli:main"                 # now you can run `pdfwm methods
 [tool.ruff]
 # Line length suitable for most projects
 line-length = 88
-target-version = "py312"
+target-version = "py311"
 
 # Exclude directories
 exclude = [
@@ -90,7 +92,7 @@ known-first-party = ["tatou_server"]  # Adjust based on your main module name
 split-on-trailing-comma = true
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false

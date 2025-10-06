@@ -1,0 +1,1 @@
+{"email": "test@example.com' AND 1=1--", "password": "test' AND 1=2--", "login": "admin' AND SUBSTRING(password,1,1)='a'--"}

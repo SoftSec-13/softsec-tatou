@@ -39,6 +39,30 @@ python -m pytest
 pre-commit install
 ```
 
+### Security Fuzzing
+
+This project includes a comprehensive fuzzing suite for security testing. See **[server/fuzz/README.md](server/fuzz/README.md)** for complete documentation.
+
+**Quick start:**
+
+```bash
+# Build fuzzer container
+docker compose build fuzzer
+
+# Run all fuzzers (~5 minutes each)
+docker compose up fuzzer
+
+# Results in server/fuzzing_results_*/
+```
+
+The fuzzer performs coverage-guided white-box testing to find:
+- Security vulnerabilities (SQL injection, XSS, auth bypass, path traversal)
+- Crashes and exceptions
+- Edge cases and boundary conditions
+
+For advanced usage, performance tuning, and interpreting results, see the [fuzzing documentation](server/fuzz/README.md).
+
+
 ### Deploy
 
 From the root of the directory:
