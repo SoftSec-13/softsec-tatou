@@ -136,7 +136,7 @@ def test_list_documents_route(client):
 def test_list_versions_route(client):
     """Test list versions endpoint."""
     parameters = {"documentid":1}
-    resp = client.get("/api/list-versions", query_string = parameters)
+    resp = client.get("/api/list-versions", query_string = parameters) 
     #resp = client.get("/api/list-versions/1") #for test without parameters
     resp_data = resp.get_json()
 
@@ -162,7 +162,7 @@ def test_list_versions_route(client):
 def test_list_all_versions_route(client):
     """Test list all versions endpoint."""
     #call without parameters
-    resp = client.get("/api/list-versions")
+    resp = client.get("/api/list-all-versions") #Fix list all versions on API.md!
     resp_data = resp.get_json()
 
     #basic tests
@@ -215,13 +215,41 @@ def test_get_watermarking_methods_route(client):
         assert isinstance(methods[i].get("description"), str)
         assert isinstance(methods[i].get("name"), str)
 
+    def test_create_watermark_route(client):
+        """Test create watermark endpoint."""
+        parameters = {"method": "robust-xmp", "position": "metadata-only", "key": "key", 
+                    "secret": "secret", "intended_for":"Mickey Mouse", "id": 1}
+        #parameters_no_id = {"method": "method", "position": "position", "key": "key", "secret": "secret", "intended_for":"Mickey Mouse"}
+        #TODO insert useful values in parameters
+        resp = client.post("/api/create-watermark", json=parameters)
+        #resp = client.post("/create-watermark/0", json=parameters_no_id)
+        data = resp.get_json()
+
+        #basic tests
+        assert resp.status_code == 201
+        assert resp.is_json
+        #check types
+        assert isinstance(data.get("id"), int)
+        assert isinstance(data.get("documentid"), int)
+        assert isinstance(data.get("link"), str)
+        assert isinstance(data.get("intended_for"), str)
+        assert isinstance(data.get("method"), str)
+        assert isinstance(data.get("position"), str)
+        assert isinstance(data.get("filename"), str)
+        assert isinstance(data.get("size"), int)
+        #check values
+        assert data.get("documentid") == parameters["id"]
+        assert data.get("intended_for") == parameters["intended_for"]
+        assert data.get("method") == parameters["method"]
+        assert data.get("position") == parameters["position"]
+
 def test_read_watermark_route(client):
     """Test read watermark endpoint."""
-    parameters = {"method": "method", "position": "position", "key": "key", "id": 0}
-    #parameters_no_id = {"method": "method", "position": "position", "key": "key"}
+    parameters = {"method": "method", "position": "position", "key": "key", "id": 1}
+    parameters_no_id = {"method": "method", "position": "position", "key": "key"}
     #TODO insert useful values in parameters
     resp = client.post("/api/read-watermark", json=parameters)
-    #resp = client.post("/read-watermark/0", json=parameters_no_id)
+    #resp = client.post("/read-watermark/1", json=parameters_no_id)
     data = resp.get_json()
 
     #basic tests
@@ -237,31 +265,3 @@ def test_read_watermark_route(client):
     assert data.get("method") == parameters["method"]
     assert data.get("position") == parameters["position"]
 
-
-def test_create_watermark_route(client):
-    """Test create watermark endpoint."""
-    parameters = {"method": "method", "position": "position", "key": "key", 
-                  "secret": "secret", "intended_for":"Mickey Mouse", "id": 0}
-    #parameters_no_id = {"method": "method", "position": "position", "key": "key", "secret": "secret", "intended_for":"Mickey Mouse"}
-    #TODO insert useful values in parameters
-    resp = client.post("/api/create-watermark", json=parameters)
-    #resp = client.post("/create-watermark/0", json=parameters_no_id)
-    data = resp.get_json()
-
-    #basic tests
-    assert resp.status_code == 200
-    assert resp.is_json
-    #check types
-    assert isinstance(data.get("id"), int)
-    assert isinstance(data.get("documentid"), int)
-    assert isinstance(data.get("link"), str)
-    assert isinstance(data.get("intended_for"), str)
-    assert isinstance(data.get("method"), str)
-    assert isinstance(data.get("position"), str)
-    assert isinstance(data.get("filename"), str)
-    assert isinstance(data.get("size"), int)
-    #check values
-    assert data.get("documentid") == parameters["id"]
-    assert data.get("intended_for") == parameters["intended_for"]
-    assert data.get("method") == parameters["method"]
-    assert data.get("position") == parameters["position"]
