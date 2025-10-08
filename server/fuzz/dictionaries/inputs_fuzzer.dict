@@ -59,9 +59,9 @@
 
 # Null byte injection
 "%00"
-"\0"
+"\x00"
 "test.pdf%00.txt"
-"test.pdf\0.jpg"
+"test.pdf\x00.jpg"
 "../../../etc/passwd%00"
 
 # File upload patterns
@@ -164,7 +164,7 @@
 "%252f"
 "%c0%27"
 "%c0%22"
-"\'"
+"'"
 "\""
 
 # MIME type spoofing
@@ -198,12 +198,12 @@
 "[]"
 
 # Unicode characters
-"\u0000"
-"\u000a"
-"\u000d"
-"\uffff"
-"\u2028"
-"\u2029"
+"\x00"
+"\x0a"
+"\x0d"
+"\xef\xbf\xbf"
+"\xe2\x80\xa8"
+"\xe2\x80\xa9"
 
 # Format string vulnerabilities
 "%s"
