@@ -1,0 +1,1 @@
+{"intended_for": "<script>alert('XSS')</script>"}

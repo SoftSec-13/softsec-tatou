@@ -1,0 +1,1 @@
+{"key": "<svg onload=alert('XSS')>"}

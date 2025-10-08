@@ -1,0 +1,17 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Metadata 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Metadata /Subtype /XML /Length 200 >>
+stream
+<?xpacket begin=""?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/" xmlns:wm="http://watermark/">
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+<rdf:Description wm:secret="test-secret" wm:key="test-key"/>
+</rdf:RDF>
+</x:xmpmeta>
+<?xpacket end="w"?>
+endstream
+endobj
+%%EOF

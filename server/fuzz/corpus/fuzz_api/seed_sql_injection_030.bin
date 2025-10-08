@@ -1,0 +1,1 @@
+{"login": "admin' AND '1'='2' UNION SELECT 1,2,3--"}

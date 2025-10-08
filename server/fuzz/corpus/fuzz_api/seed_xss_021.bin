@@ -1,0 +1,1 @@
+{"login": "<<SCRIPT>alert('XSS');//<</SCRIPT>"}

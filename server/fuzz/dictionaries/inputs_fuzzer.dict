@@ -1,0 +1,390 @@
+# Inputs Fuzzer Dictionary
+# Tokens for fuzzing input validation - path traversal, overflows, format strings, etc.
+
+# Path Traversal Sequences
+"../"
+"../../"
+"../../../"
+"../../../../"
+"../../../../../"
+"../../../../../../"
+"../../../../../../../"
+"../../../../../../../../"
+"..%2f"
+"..%252f"
+"%2e%2e/"
+"%2e%2e%2f"
+"..../"
+".....//"
+"....//..../"
+"..\\..\\..\\..\\..\\..\\..\\..\\..\\..\\..\\..\\..\\..\\..\\../"
+"..;/"
+"..%00/"
+"..%5c"
+"..%255c"
+
+# Format String Exploits
+"%s"
+"%x"
+"%d"
+"%n"
+"%p"
+"%08x"
+"%@"
+"%%"
+"%s%s%s%s%s%s%s%s%s%s"
+"%x%x%x%x%x%x%x%x%x%x"
+"%n%n%n%n%n%n%n%n%n%n"
+"%08x.%08x.%08x.%08x"
+"%1$n%2$n%3$n%4$n%5$n"
+"%1$s%2$s%3$s%4$s%5$s"
+
+# Buffer Overflow Patterns
+"A" * 100
+"A" * 256
+"A" * 512
+"A" * 1024
+"A" * 4096
+"A" * 8192
+"A" * 16384
+"A" * 32768
+"A" * 65536
+"\x90" * 100
+"\xcc" * 100
+"\x41" * 1000
+
+# Integer Overflow/Underflow
+"0"
+"-1"
+"1"
+"2147483647"
+"2147483648"
+"-2147483648"
+"-2147483649"
+"4294967295"
+"4294967296"
+"9223372036854775807"
+"9223372036854775808"
+"-9223372036854775808"
+"-9223372036854775809"
+"18446744073709551615"
+"18446744073709551616"
+"999999999999999999999999999"
+
+# Null Bytes and Special Characters
+"\x00"
+"\x00\x00"
+"%00"
+"\\0"
+"\\x00"
+"\n"
+"\r"
+"\r\n"
+"\t"
+"\b"
+"\f"
+"\v"
+"\x0b"
+"\x0c"
+"\x1f"
+"\x7f"
+"\xff"
+
+# Unicode Edge Cases
+"\u0000"
+"\uffff"
+"\ufffe"
+"\ufeff"
+"�"
+"�"
+"\ud800"
+"\udfff"
+"\U0001f4a9"
+"\U0010ffff"
+"𝕳𝖊𝖑𝖑𝖔"
+"Ｈｅｌｌｏ"
+"Ｈｅｌｌｏ"
+"ʜᴇʟʟᴏ"
+"hello"
+"HELLO"
+
+# Homoglyph and Confusables
+"а" # Cyrillic 'a'
+"е" # Cyrillic 'e'
+"о" # Cyrillic 'o'
+"р" # Cyrillic 'p'
+"с" # Cyrillic 'c'
+"ο" # Greek omicron
+"А" # Cyrillic 'A'
+"Е" # Cyrillic 'E'
+"О" # Cyrillic 'O'
+"Р" # Cyrillic 'P'
+"С" # Cyrillic 'C'
+
+# Right-to-Left Override (RTLO)
+"\u202e"
+"\u202d"
+"file\u202etxt.exe"
+"doc\u202epdf.exe"
+
+# Zero-Width Characters
+"\u200b"
+"\u200c"
+"\u200d"
+"\ufeff"
+"hello\u200bworld"
+"admin\u200badmin"
+
+# Newline Injection (CRLF)
+"%0d%0a"
+"%0a"
+"%0d"
+"\r\n"
+"\n"
+"\r"
+"foo\r\nSet-Cookie: admin=true"
+"bar%0d%0aLocation: http://evil.com"
+
+# Quote and Escape Characters
+"'"
+"\""
+"`"
+"\\"
+"\\'"
+"\\\""
+"\\`"
+"\\x27"
+"\\x22"
+"\\u0027"
+"\\u0022"
+"&#39;"
+"&#34;"
+"&#x27;"
+"&#x22;"
+
+# Encoding Variations
+"%20"
+"%2520"
+"%252520"
+"+"
+"%00"
+"%0a"
+"%0d"
+"%09"
+"..%c0%af"
+"..%e0%80%af"
+
+# Shell Metacharacters
+";"
+"|"
+"&"
+"&&"
+"||"
+"<"
+">"
+">>"
+"`"
+"$"
+"$()"
+"${}"
+"*()"
+"[]"
+"{}"
+
+# SQL Wildcards and Operators
+"*"
+"%"
+"_"
+"?"
+"["
+"]"
+"!"
+"^"
+"-"
+
+# Regular Expression DoS (ReDoS)
+"(a+)+"
+"(a*)*"
+"(a|a)*"
+"(a|ab)*"
+"(.*)*"
+"(.+)+"
+"(\\w+\\s+)*"
+
+# XML/HTML Special Characters
+"<"
+">"
+"&"
+"&lt;"
+"&gt;"
+"&amp;"
+"&quot;"
+"&apos;"
+"&#60;"
+"&#62;"
+"&#38;"
+
+# Whitespace Variations
+" "
+"  "
+"   "
+"\t"
+"\t\t"
+"\n"
+"\r"
+"\r\n"
+"\x0b"
+"\x0c"
+"\xa0"
+"\u2000"
+"\u2001"
+"\u2002"
+"\u2003"
+"\u3000"
+
+# Empty and Boundary Values
+""
+" "
+"\n"
+"null"
+"NULL"
+"Null"
+"None"
+"undefined"
+"NaN"
+"Infinity"
+"-Infinity"
+"[]"
+"{}"
+"()"
+
+# Control Characters
+"\x01"
+"\x02"
+"\x03"
+"\x04"
+"\x05"
+"\x06"
+"\x07"
+"\x08"
+"\x09"
+"\x0a"
+"\x0b"
+"\x0c"
+"\x0d"
+"\x0e"
+"\x0f"
+"\x10"
+"\x11"
+"\x12"
+"\x13"
+"\x14"
+"\x15"
+"\x16"
+"\x17"
+"\x18"
+"\x19"
+"\x1a"
+"\x1b"
+"\x1c"
+"\x1d"
+"\x1e"
+"\x1f"
+
+# Emoji and Extended Unicode
+"😀"
+"🔥"
+"💩"
+"👨‍👩‍👧‍👦"
+"🏴󠁧󠁢󠁳󠁣󠁴󠁿"
+"👍🏿"
+"🇺🇸"
+"🇬🇧"
+
+# Case Variations
+"UPPERCASE"
+"lowercase"
+"MiXeDcAsE"
+"camelCase"
+"PascalCase"
+"snake_case"
+"kebab-case"
+
+# Numeric Edge Cases
+"0"
+"-0"
+"+0"
+"0.0"
+"-0.0"
+"1e308"
+"1e-308"
+"1.7976931348623157e+308"
+"5e-324"
+"0xFFFFFFFF"
+"0o777"
+"0b11111111"
+
+# Boolean Values and Variants
+"true"
+"false"
+"True"
+"False"
+"TRUE"
+"FALSE"
+"yes"
+"no"
+"Yes"
+"No"
+"YES"
+"NO"
+"y"
+"n"
+"1"
+"0"
+"on"
+"off"
+
+# Common Injection Targets
+"../../../etc/passwd"
+"/etc/passwd"
+"/etc/shadow"
+"/proc/self/environ"
+"c:\\windows\\system32\\config\\sam"
+"c:\\boot.ini"
+"/dev/null"
+"/dev/zero"
+"/dev/random"
+"/proc/cpuinfo"
+"/proc/meminfo"
+
+# Time-based values
+"0"
+"-1"
+"999999999"
+"2147483647"
+"9999999999"
+"1970-01-01"
+"2038-01-19"
+"2106-02-07"
+"9999-12-31"
+"0000-00-00"
+"2000-02-30"
+"2000-13-01"
+
+# Array/List injection
+"[]"
+"[null]"
+"['']"
+"[0]"
+"[1,2,3,4,5]"
+"[{}]"
+"[[]]"
+"[[[[[[[[[[[[[[[["
+
+# Object injection
+"{}"
+"{'':''}"
+"{null:null}"
+"{'__proto__':{}}"
+"{'constructor':{}}"
+"{'prototype':{}}"

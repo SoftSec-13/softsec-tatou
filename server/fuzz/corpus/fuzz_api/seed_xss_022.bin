@@ -1,0 +1,1 @@
+{"password": "<IMG SRC=# onmouseover=\"alert('XSS')\">"}

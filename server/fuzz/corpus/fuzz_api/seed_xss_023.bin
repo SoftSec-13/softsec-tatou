@@ -1,0 +1,1 @@
+{"email": "<BODY ONLOAD=alert('XSS')>"}

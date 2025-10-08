@@ -1,0 +1,1 @@
+{"login": "<iframe src=javascript:alert('XSS')>"}
