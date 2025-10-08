@@ -25,7 +25,8 @@ dev = [
     "bandit>=1.7.5",
     "sqlfluff>=3.0.0",
     "requests",
-    "types-requests>=2.28.11"
+    "types-requests>=2.28.11",
+    "atheris>=2.3.0"
 ]
 
 [tool.pytest.ini_options]

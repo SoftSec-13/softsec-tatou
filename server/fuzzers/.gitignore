@@ -1,0 +1,20 @@
+# Fuzzer artifacts and outputs
+crashes/
+corpus_out/
+*.crashes/
+fuzz-*.log
+
+# Atheris artifacts
+.atheris/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Coverage data
+.coverage
+htmlcov/
+
+# OS
+.DS_Store
