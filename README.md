@@ -31,6 +31,25 @@ python -m pip install -e ".[dev]"
 python -m pytest
 ```
 
+### Run fuzzers
+
+Fuzzing tests the robustness of the PDF watermarking code against malformed and edge-case inputs:
+
+```bash
+cd tatou/server/fuzzers
+
+# Verify fuzzer setup
+python3 verify_fuzzer_setup.py
+
+# Run all fuzzers (quick test)
+./run_fuzzers.sh
+
+# Run individual fuzzer for longer
+python3 fuzz_watermarking.py -atheris_runs=100000
+```
+
+See [`server/fuzzers/README.md`](server/fuzzers/README.md) for detailed fuzzing documentation.
+
 ### Enable pre-commit
 ```bash
 # Activate your virtual environement
