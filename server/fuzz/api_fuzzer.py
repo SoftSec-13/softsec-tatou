@@ -12,12 +12,15 @@ This fuzzer targets Flask API endpoints with various attack patterns including:
 - Authentication bypass
 """
 
+import logging
 import sys
 
 import atheris
 
 with atheris.instrument_imports():
     from utils import check_security_vulnerabilities, get_app, make_fuzzed_auth
+
+logger = logging.getLogger(__name__)
 
 
 # API endpoints to test
@@ -172,9 +175,14 @@ def fuzz_one_input(data: bytes) -> None:
         raise
     except AssertionError:
         raise
-    except Exception:
-        # Expected for malformed requests
-        pass
+    except Exception as exc:
+        logger.debug(
+            "Fuzzed request for %s %s failed: %s",
+            method,
+            endpoint,
+            exc,
+            exc_info=True,
+        )
 
 
 def main() -> None:

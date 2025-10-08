@@ -194,6 +194,14 @@ docker compose run --rm fuzzer python fuzz/inputs_fuzzer.py \
     fuzz/seeds/inputs_fuzzer/ \
     -max_total_time=300 \
     -dict=fuzz/dictionaries/inputs_fuzzer.dict
+
+# Stateful fuzzer
+docker compose run --rm fuzzer python fuzz/stateful_fuzzer.py \
+          fuzz/corpus/stateful_fuzzer \
+          fuzz/seeds/stateful_fuzzer \
+          -max_total_time=300 \
+          -dict=fuzz/dictionaries/stateful_fuzzer.dict
+
 ```
 
 ### Advanced Options

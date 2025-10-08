@@ -7,6 +7,7 @@ an ephemeral SQLite database for fuzzing, along with file system utilities.
 from __future__ import annotations
 
 import atexit
+import logging
 import os
 import shutil
 import sys
@@ -19,8 +20,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "src"))
 # Disable RMAP for fuzzing
 os.environ.setdefault("TATOU_TEST_DISABLE_RMAP", "1")
 
+logger = logging.getLogger(__name__)
+
 # Temp storage setup
-_TEMP_ROOT = Path(tempfile.mkdtemp(prefix="fuzz-", dir="/tmp"))
+_TEMP_ROOT = Path(tempfile.mkdtemp(prefix="fuzz-"))
 _STORAGE_DIR = _TEMP_ROOT / "storage"
 _STORAGE_DIR.mkdir(exist_ok=True)
 os.environ["STORAGE_DIR"] = str(_STORAGE_DIR)
@@ -66,10 +69,16 @@ def init_test_db():
                 except ValueError:
                     return None
 
+            def _last_insert_id() -> int | None:
+                try:
+                    cursor = dbapi_conn.execute("SELECT last_insert_rowid()")
+                    row = cursor.fetchone()
+                    return int(row[0]) if row and row[0] is not None else None
+                except Exception:
+                    return None
+
             dbapi_conn.create_function("UNHEX", 1, _unhex)
-            dbapi_conn.create_function(
-                "LAST_INSERT_ID", 0, dbapi_conn.last_insert_rowid
-            )
+            dbapi_conn.create_function("LAST_INSERT_ID", 0, _last_insert_id)
 
         with engine.begin() as conn:
             conn.execute(
@@ -120,7 +129,8 @@ def init_test_db():
         _DB_INITIALIZED = True
         _TEST_ENGINE = engine
         return engine
-    except Exception:
+    except Exception as exc:
+        logger.warning("[tatou-fuzz] init_test_db fallback: %s", exc, exc_info=True)
         _TEST_ENGINE = None
         return None
 
@@ -186,9 +196,13 @@ def cleanup_storage() -> None:
                 conn.execute(text("DELETE FROM Versions"))
                 conn.execute(text("DELETE FROM Documents"))
                 conn.execute(text("DELETE FROM Users"))
-        except Exception:
+        except Exception as exc:
             # Database cleanup failures should not crash the fuzzer loop
-            pass
+            logger.debug(
+                "Database cleanup failed during fuzz teardown: %s",
+                exc,
+                exc_info=True,
+            )
 
 
 @atexit.register

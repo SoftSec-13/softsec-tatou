@@ -95,9 +95,9 @@ def load_pdf_bytes(src: PdfSource) -> bytes:
     ValueError
         If the resolved bytes do not appear to be a PDF file.
     """
-    if isinstance(src, (bytes, bytearray)):
+    if isinstance(src, bytes | bytearray):
         data = bytes(src)
-    elif isinstance(src, (str, os.PathLike)):
+    elif isinstance(src, str | os.PathLike):
         with open(os.fspath(src), "rb") as fh:
             data = fh.read()
     elif hasattr(src, "read"):

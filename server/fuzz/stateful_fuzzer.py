@@ -8,21 +8,24 @@ This fuzzer tests sequences of API calls including:
 - Session management
 """
 
+from __future__ import annotations
+
 import io
+import logging
+import secrets
 import sys
-from typing import TYPE_CHECKING
 
 import atheris
 
 with atheris.instrument_imports():
+    from flask.testing import FlaskClient
     from utils import cleanup_storage, get_app
 
-if TYPE_CHECKING:  # pragma: no cover - hints only
-    from flask.testing import FlaskClient
+logger = logging.getLogger(__name__)
 
 
 def _create_user_and_auth(
-    client: "FlaskClient", email: str, password: str, login: str
+    client: FlaskClient, email: str, password: str, login: str
 ) -> str | None:
     """Create a user (ignoring existing ones) and return a Bearer token."""
     resp = client.post(
@@ -51,7 +54,7 @@ def fuzz_user_lifecycle(fdp: atheris.FuzzedDataProvider) -> None:
 
     # Generate test data
     user1_email = f"user1_{fdp.ConsumeIntInRange(0, 999999)}@fuzz.test"
-    user1_password = fdp.ConsumeUnicodeNoSurrogates(32) or "password123"
+    user1_password = fdp.ConsumeUnicodeNoSurrogates(32) or secrets.token_urlsafe(16)
     user1_login = user1_email.split("@")[0]
 
     try:
@@ -82,7 +85,7 @@ def fuzz_user_lifecycle(fdp: atheris.FuzzedDataProvider) -> None:
 
             # 4. IDOR Test: Create second user and try to access first user's document
             user2_email = f"user2_{fdp.ConsumeIntInRange(0, 999)}@fuzz.test"
-            user2_password = "password456"
+            user2_password = secrets.token_urlsafe(16)
             user2_login = user2_email.split("@")[0]
 
             auth2 = _create_user_and_auth(
@@ -116,15 +119,16 @@ def fuzz_user_lifecycle(fdp: atheris.FuzzedDataProvider) -> None:
                 for doc in docs:
                     if doc.get("id") == doc_id:
                         raise AssertionError(
-                            "IDOR: User 2 can list User 1's document in /api/list-documents"
+                            "IDOR: User 2 can list User 1's document "
+                            "in /api/list-documents"
                         )
 
     except (SystemExit, KeyboardInterrupt):
         raise
     except AssertionError:
         raise
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("Stateful lifecycle fuzz failed: %s", exc, exc_info=True)
     finally:
         cleanup_storage()
 
@@ -138,7 +142,7 @@ def fuzz_watermark_workflow(fdp: atheris.FuzzedDataProvider) -> None:
     app = get_app()
 
     user_email = f"wm_user_{fdp.ConsumeIntInRange(0, 999999)}@fuzz.test"
-    user_password = "password789"
+    user_password = secrets.token_urlsafe(16)
     user_login = user_email.split("@")[0]
 
     try:
@@ -188,8 +192,8 @@ def fuzz_watermark_workflow(fdp: atheris.FuzzedDataProvider) -> None:
         raise
     except AssertionError:
         raise
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("Watermark workflow fuzz failed: %s", exc, exc_info=True)
     finally:
         cleanup_storage()
 
@@ -203,7 +207,7 @@ def fuzz_session_management(fdp: atheris.FuzzedDataProvider) -> None:
     app = get_app()
 
     email = f"session_{fdp.ConsumeIntInRange(0, 999999)}@fuzz.test"
-    password = "pass123"
+    password = secrets.token_urlsafe(16)
 
     try:
         with app.test_client() as client:
@@ -246,8 +250,10 @@ def fuzz_session_management(fdp: atheris.FuzzedDataProvider) -> None:
         raise
     except AssertionError:
         raise
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("Session management fuzz failed: %s", exc, exc_info=True)
+    finally:
+        cleanup_storage()
 
 
 def fuzz_one_input(data: bytes) -> None:

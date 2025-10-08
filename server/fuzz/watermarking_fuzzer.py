@@ -10,6 +10,7 @@ This fuzzer generates various PDF structures to test:
 - Malformed PDFs
 """
 
+import logging
 import sys
 
 import atheris
@@ -18,6 +19,8 @@ with atheris.instrument_imports():
     from utils import generate_fuzzed_pdf, make_temp_file
 
     import watermarking_utils as wm
+
+logger = logging.getLogger(__name__)
 
 
 def fuzz_one_input(data: bytes) -> None:
@@ -58,7 +61,7 @@ def fuzz_one_input(data: bytes) -> None:
             intended_for="fuzzer",
         )
 
-        if not isinstance(result, (bytes, bytearray)):
+        if not isinstance(result, bytes | bytearray):
             raise AssertionError("apply_watermark must return bytes")
 
         if not result.startswith(b"%PDF"):
@@ -77,9 +80,8 @@ def fuzz_one_input(data: bytes) -> None:
         raise
     except AssertionError:
         raise
-    except Exception:
-        # Expected for malformed PDFs
-        pass
+    except Exception as exc:
+        logger.debug("Watermark fuzz failed: %s", exc, exc_info=True)
     finally:
         pdf_path.unlink(missing_ok=True)
 

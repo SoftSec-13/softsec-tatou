@@ -9,12 +9,15 @@ This fuzzer focuses on:
 """
 
 import io
+import logging
 import sys
 
 import atheris
 
 with atheris.instrument_imports():
     from utils import cleanup_storage, get_app, make_auth_header, make_fuzzed_auth
+
+logger = logging.getLogger(__name__)
 
 
 # SQL injection and path traversal patterns
@@ -65,8 +68,8 @@ def fuzz_sql_injection(fdp: atheris.FuzzedDataProvider) -> None:
         raise
     except AssertionError:
         raise
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("SQL fuzz request failed: %s", exc, exc_info=True)
 
 
 def fuzz_file_upload(fdp: atheris.FuzzedDataProvider) -> None:
@@ -105,8 +108,8 @@ def fuzz_file_upload(fdp: atheris.FuzzedDataProvider) -> None:
         raise
     except AssertionError:
         raise
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("File upload fuzz failed: %s", exc, exc_info=True)
     finally:
         cleanup_storage()
 
