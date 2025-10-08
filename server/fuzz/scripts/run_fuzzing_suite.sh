@@ -21,9 +21,10 @@ echo
 
 # Fuzzers to run
 FUZZERS=(
-  fuzz_api
-  fuzz_watermarking
-  fuzz_inputs
+  api_fuzzer
+  inputs_fuzzer
+  watermarking_fuzzer
+  stateful_fuzzer
 )
 
 # Setup coverage
@@ -41,20 +42,42 @@ for fuzzer in "${FUZZERS[@]}"; do
   echo "Running ${fuzzer}..."
   log="${OUTPUT_DIR}/${fuzzer}.log"
   corpus_dir="fuzz/corpus/${fuzzer}"
+  seeds_dir="fuzz/seeds/${fuzzer}"
+  dict_file="fuzz/dictionaries/${fuzzer}.dict"
 
   # Create corpus dir if missing
   mkdir -p "${corpus_dir}"
 
+  # Build fuzzer command with corpus (writable) and seeds (read-only)
+  fuzz_cmd=(
+    timeout $((FUZZ_TIME + 60)) ${COV_CMD} "fuzz/${fuzzer}.py"
+    "${corpus_dir}"
+  )
+
+  # Add seeds directory if it exists
+  if [[ -d "${seeds_dir}" ]]; then
+    fuzz_cmd+=("${seeds_dir}")
+    echo "  Using seeds: ${seeds_dir}"
+  fi
+
+  # Add fuzzer options
+  fuzz_cmd+=(
+    -max_total_time="${FUZZ_TIME}"
+    -max_len="${MAX_LEN}"
+    -workers="${WORKERS}"
+    -jobs="${WORKERS}"
+    -artifact_prefix="${OUTPUT_DIR}/${fuzzer}_"
+    -print_final_stats=1
+  )
+
+  # Add dictionary if it exists
+  if [[ -f "${dict_file}" ]]; then
+    fuzz_cmd+=(-dict="${dict_file}")
+    echo "  Using dictionary: ${dict_file}"
+  fi
+
   set +e
-  timeout $((FUZZ_TIME + 60)) ${COV_CMD} "fuzz/${fuzzer}.py" \
-    "${corpus_dir}" \
-    -max_total_time="${FUZZ_TIME}" \
-    -max_len="${MAX_LEN}" \
-    -workers="${WORKERS}" \
-    -jobs="${WORKERS}" \
-    -artifact_prefix="${OUTPUT_DIR}/${fuzzer}_" \
-    -print_final_stats=1 \
-    2>&1 | tee "${log}"
+  "${fuzz_cmd[@]}" 2>&1 | tee "${log}"
 
   status=$?
   set -e

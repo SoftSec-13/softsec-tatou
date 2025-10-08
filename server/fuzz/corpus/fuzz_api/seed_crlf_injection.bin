@@ -1,1 +1,0 @@
-{"email": "test@example.com\r\nSet-Cookie: admin=true", "password": "pass\r\n\r\n<script>alert(1)</script>", "login": "user\r\nLocation: http://evil.com"}

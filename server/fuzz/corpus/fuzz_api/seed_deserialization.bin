@@ -1,1 +1,0 @@
-{"email": "cPickle.loads(b'cos\\nsystem\\n(S\\'ls -la\\'\\ntR.')", "password": "__import__('os').system('id')", "secret": "eval('__import__(\"os\").system(\"whoami\")')"}

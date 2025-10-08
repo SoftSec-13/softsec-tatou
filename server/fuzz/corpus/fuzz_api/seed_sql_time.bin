@@ -1,1 +1,0 @@
-{"email": "test@example.com' OR SLEEP(5)--", "password": "admin'; WAITFOR DELAY '00:00:05'--", "login": "user' AND (SELECT * FROM (SELECT(SLEEP(5)))a)--"}

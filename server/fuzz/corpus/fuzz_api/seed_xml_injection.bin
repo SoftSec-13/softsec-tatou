@@ -1,1 +1,0 @@
-{"email": "<?xml version=\"1.0\"?><!DOCTYPE foo [<!ENTITY xxe SYSTEM \"file:///etc/passwd\">]><foo>&xxe;</foo>", "password": "<![CDATA[<script>alert(1)</script>]]>"}

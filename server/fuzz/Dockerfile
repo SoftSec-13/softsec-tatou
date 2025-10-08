@@ -1,3 +1,4 @@
+# Use python 3.11 because atheris does not support 3.12 yet
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \

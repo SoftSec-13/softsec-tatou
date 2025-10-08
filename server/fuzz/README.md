@@ -1,43 +1,63 @@
 # Tatou Fuzzing Suite
 
-**Coverage-guided security fuzzing for the Tatou PDF watermarking platform using Atheris (libFuzzer for Python).**
+**Industry-standard coverage-guided security fuzzing using Atheris (Google's libFuzzer for Python).**
 
 ## Overview
 
-This fuzzing suite performs **white-box security testing** to discover:
-- 🔒 **Security vulnerabilities** (SQL injection, path traversal, auth bypass, information disclosure)
-- 💥 **Crashes and exceptions** (memory corruption, unhandled errors)
-- 🐛 **Edge cases** (malformed inputs, boundary conditions)
+White-box security testing to discover:
+- 🔒 **Security vulnerabilities** - SQL injection, XSS, SSRF, path traversal, IDOR, auth bypass, JWT flaws
+- 💥 **Crashes and exceptions** - Memory corruption, unhandled errors, race conditions
+- 🐛 **Edge cases** - Malformed inputs, boundary conditions, type confusion
 
-Unlike black-box testing, this fuzzer uses **coverage feedback** to intelligently mutate inputs and explore new code paths.
+**Key Features:**
+- ✅ Python coverage tracking enabled (`enable_python_coverage=True`)
+- ✅ Structure-aware mutations via dictionaries (198-281 tokens per fuzzer)
+- ✅ Advanced attack pattern detection (JWT, XXE, NoSQL, SSTI, prototype pollution)
+- ✅ Stateful fuzzing for multi-step workflows and IDOR
+- ✅ Race condition detection via concurrent requests
+- ✅ Enhanced PDF generation (6 strategies: valid, malicious, nested, memory exhaustion)
 
 ## Architecture
 
 ### Fuzzers
 
-| Fuzzer | Target | Purpose |
-|--------|--------|---------|
-| **fuzz_api.py** | Flask API endpoints | Tests authentication, authorization, input validation, error handling |
-| **fuzz_inputs.py** | Input validation | Focuses on SQL injection and file upload security |
-| **fuzz_watermarking.py** | PDF watermarking | Tests PDF parsing and watermark operations |
+| Fuzzer | Target | Focus | Dictionary Tokens |
+|--------|--------|-------|-------------------|
+| **api_fuzzer.py** | REST API endpoints | Auth, input validation, type confusion, header fuzzing | 198 |
+| **inputs_fuzzer.py** | Input validation | SQL injection (30+ variants), path traversal, file upload | 247 |
+| **watermarking_fuzzer.py** | PDF operations | Structure-aware PDF mutations, malicious payloads | 281 |
+| **stateful_fuzzer.py** | Multi-step workflows | IDOR, session management, state transitions | 95 |
 
 ### Key Components
 
 ```
 fuzz/
-├── README.md                    # This file
-├── Dockerfile                   # Python 3.11 container (atheris requirement)
-├── requirements.txt             # atheris==2.3.0, coverage
-├── common.py                    # Shared utilities (app singleton, auth, DB init)
-├── fuzz_api.py                  # API endpoint fuzzer
-├── fuzz_inputs.py               # Input validation fuzzer
-├── fuzz_watermarking.py         # Watermarking fuzzer
-├── corpus/                      # Seed inputs for each fuzzer
-│   ├── fuzz_api/
-│   ├── fuzz_inputs/
-│   └── fuzz_watermarking/
+├── README.md                      # This file
+├── Dockerfile                     # Python 3.11 container
+├── requirements.txt               # Dependencies
+├── api_fuzzer.py                  # API endpoint fuzzer
+├── inputs_fuzzer.py               # Input validation fuzzer
+├── watermarking_fuzzer.py         # PDF watermarking fuzzer
+├── stateful_fuzzer.py             # Multi-step workflow fuzzer
+├── utils/                         # Shared utilities (modular design)
+│   ├── __init__.py               # Package exports
+│   ├── app_setup.py              # Flask app and DB initialization
+│   ├── auth_helpers.py           # Auth token generation
+│   ├── pdf_generators.py         # PDF generation strategies
+│   └── security_checks.py        # Vulnerability detection
+├── dictionaries/                  # Structure-aware mutation dictionaries
+│   ├── api_fuzzer.dict           # 198 tokens
+│   ├── inputs_fuzzer.dict        # 247 tokens
+│   ├── watermarking_fuzzer.dict  # 281 tokens
+│   └── stateful_fuzzer.dict      # 95 tokens
+├── seeds/                         # Curated seed inputs (version controlled)
+│   ├── api_fuzzer/               # Seeds for API fuzzing
+│   ├── inputs_fuzzer/            # Seeds for input validation
+│   ├── watermarking_fuzzer/      # Seeds for PDF fuzzing
+│   └── stateful_fuzzer/          # Seeds for stateful fuzzing
+├── corpus/                        # Runtime discoveries (gitignored, auto-generated hashes)
 └── scripts/
-    └── run_fuzzing_suite.sh     # Orchestrates all fuzzers
+    └── run_fuzzing_suite.sh       # Orchestrates all 4 fuzzers
 ```
 
 ## How It Works
@@ -79,15 +99,33 @@ def check_security_issues(resp, endpoint: str):
 
 When a vulnerability is found, the fuzzer **crashes with an assertion**, saving the input that triggered it.
 
-### 3. Seed Corpus
+### 3. Seed Corpus & Runtime Discovery
 
-Each fuzzer starts with **intelligent seed inputs** rather than random bytes:
+The fuzzing suite uses a **two-tier corpus strategy**:
 
-- **fuzz_api**: Valid JSON payloads, SQL injection patterns
-- **fuzz_inputs**: Path traversal attempts (`../../../etc/passwd`)
-- **fuzz_watermarking**: Minimal valid PDF structure
+#### Seeds (`seeds/` - version controlled)
+Human-curated test cases with descriptive names:
+- **api_fuzzer/**: `sql_injection_or.bin`, `valid_json_request.bin`
+- **inputs_fuzzer/**: `path_traversal_etc_passwd.bin`
+- **watermarking_fuzzer/**: `minimal_valid_pdf.bin`
+- **stateful_fuzzer/**: `create_user_flow.bin`
 
-This dramatically speeds up bug discovery.
+**Naming convention:** Use descriptive names explaining what each seed tests (e.g., `xss_script_tag.bin`, not `test1.bin` or random hashes).
+
+#### Runtime Corpus (`corpus/` - gitignored)
+Auto-generated during fuzzing:
+- Files are **SHA1 hashes** (libFuzzer convention)
+- Contains inputs that discovered new code paths
+- Grows over time as fuzzer finds interesting mutations
+- Examples: `94a1e1be76067891b1ceaa31ce162728c07bb439`
+
+**Why separate?**
+- ✅ Seeds remain clean and understandable
+- ✅ Runtime discoveries tracked by hash (libFuzzer standard)
+- ✅ Seeds in git, runtime corpus ignored
+- ✅ Faster bug discovery with quality seeds
+
+The fuzzer reads seeds first (read-only), then writes discoveries to corpus (writable).
 
 ### 4. In-Memory Database
 
@@ -136,20 +174,26 @@ FUZZ_TIME=600 MAX_LEN=10000 docker compose up fuzzer
 
 ```bash
 # API fuzzer only
-docker compose run --rm fuzzer python fuzz/fuzz_api.py \
-    fuzz/corpus/fuzz_api/ \
+docker compose run --rm fuzzer python fuzz/api_fuzzer.py \
+    fuzz/corpus/api_fuzzer/ \
+    fuzz/seeds/api_fuzzer/ \
     -max_total_time=300 \
-    -max_len=5000
+    -max_len=5000 \
+    -dict=fuzz/dictionaries/api_fuzzer.dict
 
 # Watermarking fuzzer
-docker compose run --rm fuzzer python fuzz/fuzz_watermarking.py \
-    fuzz/corpus/fuzz_watermarking/ \
-    -max_total_time=300
+docker compose run --rm fuzzer python fuzz/watermarking_fuzzer.py \
+    fuzz/corpus/watermarking_fuzzer/ \
+    fuzz/seeds/watermarking_fuzzer/ \
+    -max_total_time=300 \
+    -dict=fuzz/dictionaries/watermarking_fuzzer.dict
 
 # Input validation fuzzer
-docker compose run --rm fuzzer python fuzz/fuzz_inputs.py \
-    fuzz/corpus/fuzz_inputs/ \
-    -max_total_time=300
+docker compose run --rm fuzzer python fuzz/inputs_fuzzer.py \
+    fuzz/corpus/inputs_fuzzer/ \
+    fuzz/seeds/inputs_fuzzer/ \
+    -max_total_time=300 \
+    -dict=fuzz/dictionaries/inputs_fuzzer.dict
 ```
 
 ### Advanced Options
@@ -157,13 +201,14 @@ docker compose run --rm fuzzer python fuzz/fuzz_inputs.py \
 LibFuzzer flags (see [LibFuzzer docs](https://llvm.org/docs/LibFuzzer.html)):
 
 ```bash
-docker compose run --rm fuzzer python fuzz/fuzz_api.py \
-    fuzz/corpus/fuzz_api/ \
+docker compose run --rm fuzzer python fuzz/api_fuzzer.py \
+    fuzz/corpus/api_fuzzer/ \
+    fuzz/seeds/api_fuzzer/ \
     -max_total_time=600 \          # Fuzz for 10 minutes
     -max_len=10000 \                # Allow 10KB inputs
     -workers=4 \                    # Use 4 parallel workers
     -jobs=4 \                       # Run 4 jobs
-    -dict=fuzz/api.dict \           # Use dictionary (if created)
+    -dict=fuzz/dictionaries/api_fuzzer.dict \
     -print_final_stats=1            # Show statistics at end
 ```
 
@@ -172,8 +217,9 @@ docker compose run --rm fuzzer python fuzz/fuzz_api.py \
 For **faster fuzzing** and **better resource usage**:
 
 ```bash
-docker compose run --rm fuzzer python fuzz/fuzz_api.py \
-    fuzz/corpus/fuzz_api/ \
+docker compose run --rm fuzzer python fuzz/api_fuzzer.py \
+    fuzz/corpus/api_fuzzer/ \
+    fuzz/seeds/api_fuzzer/ \
     -max_total_time=3600 \
     -timeout=30 \                   # Kill inputs that hang >30s
     -rss_limit_mb=2048 \            # Limit memory to 2GB (prevent OOM)
@@ -187,10 +233,10 @@ docker compose run --rm fuzzer python fuzz/fuzz_api.py \
 
 ```bash
 # Merge and minimize corpus from multiple runs
-docker compose run --rm fuzzer python fuzz/fuzz_api.py \
+docker compose run --rm fuzzer python fuzz/api_fuzzer.py \
     -merge=1 \
-    fuzz/corpus/fuzz_api_merged/ \
-    fuzz/corpus/fuzz_api/ \
+    fuzz/corpus/api_fuzzer_merged/ \
+    fuzz/corpus/api_fuzzer/ \
     fuzzing_results_*/corpus/
 
 # This removes duplicate/redundant inputs, keeping only unique coverage
@@ -202,12 +248,12 @@ docker compose run --rm fuzzer python fuzz/fuzz_api.py \
 
 ```
 === Tatou Fuzzing Suite ===
-Running fuzz_api...
+Running api_fuzzer...
 #2      INITED exec/s: 0 rss: 54Mb
 #4096   pulse  corp: 12/234b lim: 43 exec/s: 2048
 #8192   pulse  corp: 28/1.2kb lim: 80 exec/s: 2730
 #16384  pulse  corp: 45/3.4kb lim: 163 exec/s: 2340
-✓ fuzz_api completed
+✓ api_fuzzer completed
 ```
 
 **Good signs:**
@@ -222,7 +268,7 @@ AssertionError: SQL error leaked in /api/create-user: found 'syntax error'
 ```
 
 **This is what you want to find!** The fuzzer discovered a vulnerability:
-- Input saved to `fuzzing_results_*/fuzz_api_crash-*`
+- Input saved to `fuzzing_results_*/api_fuzzer_crash-*`
 - Reproduce by running that input through the fuzzer
 - Fix the bug in the application code
 - Re-run fuzzer to verify fix
@@ -252,24 +298,29 @@ Review coverage to find untested code paths.
 
 ### Adding New Fuzzers
 
-1. **Create fuzzer file:** `fuzz/fuzz_newfeature.py`
+1. **Create fuzzer file:** `fuzz/newfeature_fuzzer.py`
 
 ```python
 #!/usr/bin/env python3
+"""New feature fuzzer - Description of what it tests."""
 import sys
 import atheris
 
 with atheris.instrument_imports():
-    import common
-    from server import create_app
+    from utils import get_app, make_auth_header, check_security_vulnerabilities
     # Import all code under test
 
-def fuzz_newfeature(data: bytes):
+def fuzz_one_input(data: bytes) -> None:
+    """Fuzz new feature.
+
+    Args:
+        data: Raw bytes from fuzzer
+    """
     if len(data) < 8:
         return
 
     fdp = atheris.FuzzedDataProvider(data)
-    app = common.get_app()
+    app = get_app()
 
     # Build test inputs
     payload = {
@@ -279,11 +330,17 @@ def fuzz_newfeature(data: bytes):
     try:
         # Call code under test
         with app.test_client() as client:
-            resp = client.post("/api/endpoint", json=payload)
+            resp = client.post(
+                "/api/endpoint",
+                json=payload,
+                headers={"Authorization": make_auth_header()}
+            )
 
         # Add security checks
         if resp.status_code not in {200, 400, 401}:
             raise AssertionError(f"Unexpected status: {resp.status_code}")
+
+        check_security_vulnerabilities(resp, "/api/endpoint")
 
     except (SystemExit, KeyboardInterrupt):
         raise
@@ -292,40 +349,52 @@ def fuzz_newfeature(data: bytes):
     except Exception:
         pass  # Expected for malformed inputs
 
-def main():
-    atheris.Setup(sys.argv, fuzz_newfeature)
+def main() -> None:
+    """Entry point for fuzzer."""
+    atheris.Setup(sys.argv, fuzz_one_input, enable_python_coverage=True)
     atheris.Fuzz()
 
 if __name__ == "__main__":
     main()
 ```
 
-2. **Create seed corpus:** `fuzz/corpus/fuzz_newfeature/seed_*.bin`
+2. **Create seed corpus:** `fuzz/seeds/newfeature_fuzzer/`
+   - Add descriptive seed files: `valid_request.bin`, `edge_case_empty.bin`, etc.
 
-3. **Add to suite:** Edit `fuzz/scripts/run_fuzzing_suite.sh`:
+3. **Create dictionary (optional):** `fuzz/dictionaries/newfeature_fuzzer.dict`
+
+4. **Add to suite:** Edit `fuzz/scripts/run_fuzzing_suite.sh`:
 ```bash
 FUZZERS=(
-  fuzz_api
-  fuzz_watermarking
-  fuzz_inputs
-  fuzz_newfeature  # Add here
+  api_fuzzer
+  inputs_fuzzer
+  watermarking_fuzzer
+  stateful_fuzzer
+  newfeature_fuzzer  # Add here
 )
 ```
 
 ### Improving Seed Corpus
 
-Add realistic inputs that exercise different code paths:
+Add realistic inputs that exercise different code paths in `seeds/` directory:
 
 ```bash
 # Valid inputs
-echo '{"email": "user@test.com", "password": "pass123"}' > corpus/fuzz_api/seed_valid.bin  # pragma: allowlist secret
+echo '{"email": "user@test.com", "password": "pass123"}' > seeds/api_fuzzer/valid_login.bin  # pragma: allowlist secret
 
 # Boundary conditions
-echo '{"email": "", "password": "x"}' > corpus/fuzz_api/seed_empty.bin
+echo '{"email": "", "password": "x"}' > seeds/api_fuzzer/empty_email.bin
 
 # Attack patterns
-echo '{"email": "admin@test.com", "password": "' OR 1=1--"}' > corpus/fuzz_api/seed_sqli.bin
+echo '{"email": "admin@test.com", "password": "' OR 1=1--"}' > seeds/api_fuzzer/sql_injection_password.bin
 ```
+
+**Best practices for seeds:**
+- Use descriptive filenames (not `test1.bin` or hashes)
+- Cover attack vectors (SQLi, XSS, path traversal)
+- Include at least one completely valid input
+- Add edge cases (empty, very long, boundary values)
+- Quality > quantity (10-20 good seeds better than 1000 random ones)
 
 ### Enhancing Vulnerability Detection
 
@@ -505,14 +574,14 @@ with atheris.instrument_imports():
 1. **Reproduce:** Run the crash-* artifact through the fuzzer
 ```bash
 # Replay the exact crashing input
-docker compose run --rm fuzzer python fuzz/fuzz_api.py \
-    fuzzing_results_*/fuzz_api_crash-abc123
+docker compose run --rm fuzzer python fuzz/api_fuzzer.py \
+    fuzzing_results_*/api_fuzzer_crash-abc123
 ```
 
 2. **Minimize:** Shrink the input to its minimal form
 ```bash
-docker compose run --rm fuzzer python fuzz/fuzz_api.py \
-    fuzzing_results_*/fuzz_api_crash-abc123 \
+docker compose run --rm fuzzer python fuzz/api_fuzzer.py \
+    fuzzing_results_*/api_fuzzer_crash-abc123 \
     -minimize_crash=1 \
     -exact_artifact_path=minimal_crash
 ```
@@ -520,11 +589,11 @@ docker compose run --rm fuzzer python fuzz/fuzz_api.py \
 3. **Debug:** Examine the input and stack trace
 ```bash
 # View the crashing input
-xxd fuzzing_results_*/fuzz_api_crash-abc123
+xxd fuzzing_results_*/api_fuzzer_crash-abc123
 
 # Run with Python debugger
-docker compose run --rm fuzzer python -m pdb fuzz/fuzz_api.py \
-    fuzzing_results_*/fuzz_api_crash-abc123
+docker compose run --rm fuzzer python -m pdb fuzz/api_fuzzer.py \
+    fuzzing_results_*/api_fuzzer_crash-abc123
 ```
 
 4. **Fix:** Patch the vulnerability in application code
@@ -532,8 +601,8 @@ docker compose run --rm fuzzer python -m pdb fuzz/fuzz_api.py \
 5. **Verify:** Re-run fuzzer to confirm it's fixed
 ```bash
 # Should not crash anymore
-docker compose run --rm fuzzer python fuzz/fuzz_api.py \
-    fuzzing_results_*/fuzz_api_crash-abc123
+docker compose run --rm fuzzer python fuzz/api_fuzzer.py \
+    fuzzing_results_*/api_fuzzer_crash-abc123
 
 # Run full fuzzer to ensure no regressions
 FUZZ_TIME=600 docker compose up fuzzer
@@ -557,9 +626,10 @@ Expected performance on modern hardware (4-core CPU, 8GB RAM):
 
 | Fuzzer | exec/s | corpus/hour | Resource |
 |--------|--------|-------------|----------|
-| fuzz_api | 2000-3000 | +50 inputs | Light (CPU-bound) |
-| fuzz_inputs | 1500-2500 | +40 inputs | Medium (I/O for files) |
-| fuzz_watermarking | 500-1000 | +20 inputs | Heavy (PDF parsing) |
+| api_fuzzer | 2000-3000 | +50 inputs | Light (CPU-bound) |
+| inputs_fuzzer | 1500-2500 | +40 inputs | Medium (I/O for files) |
+| watermarking_fuzzer | 500-1000 | +20 inputs | Heavy (PDF parsing) |
+| stateful_fuzzer | 800-1500 | +30 inputs | Medium (multi-step flows) |
 
 **Factors affecting performance:**
 - ✅ **Fast:** Simple input validation, pure computation

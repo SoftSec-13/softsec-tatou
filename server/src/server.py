@@ -290,7 +290,7 @@ def create_app():
         start_db = time.time()
         # Validate file size
         MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
-        if file.content_length > MAX_FILE_SIZE:
+        if file.content_length and file.content_length > MAX_FILE_SIZE:
             return jsonify({"error": "file too large"}), 413
 
         # Validate file type and MIME type

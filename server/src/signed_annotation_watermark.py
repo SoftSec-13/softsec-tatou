@@ -196,7 +196,8 @@ class SignedAnnotationWatermark(WatermarkingMethod):
             nonce = base64.b64decode(manifest["nonce"])
             ct = base64.b64decode(manifest["ct"])
             iter_count = int(manifest.get("iter", self._PBKDF2_ITER))
-            if iter_count <= 0 or iter_count > 2_000_000:  # sanity bounds
+            # Limit to 300k iterations to prevent DoS attacks via excessive PBKDF2 computation
+            if iter_count <= 0 or iter_count > 300_000:
                 raise WatermarkingError("Unreasonable PBKDF2 iteration count")
 
             key_bytes = self._derive_key(key, salt, iter_override=iter_count)
