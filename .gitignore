@@ -1,5 +1,6 @@
-# Ignore pdfs
+# Ignore pdfs (except fuzzer seeds)
 *.pdf
+!server/fuzzers/seeds/**/*.pdf
 
 # Ignore debug files
 .vscode/
