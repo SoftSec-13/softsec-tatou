@@ -82,7 +82,7 @@ def create_app():
 
     # --- Helpers ---
     def _serializer():
-        return URLSafeTimedSerializer(app.config["SECRET_KEY"], salt="tatou-auth")
+        return URLSafeTimedSerializer(app.config["SECRET_KEY"], salt="ljkdsad123123kjd")
 
     def _auth_error(msg: str, code: int = 401):
         return jsonify({"error": msg}), code
