@@ -215,14 +215,13 @@ def test_get_watermarking_methods_route(client):
         assert isinstance(methods[i].get("description"), str)
         assert isinstance(methods[i].get("name"), str)
 
-    def test_create_watermark_route(client):
+def test_create_watermark_route(client):
         """Test create watermark endpoint."""
         parameters = {"method": "robust-xmp", "position": "metadata-only", "key": "key", 
                     "secret": "secret", "intended_for":"Mickey Mouse", "id": 1}
-        #parameters_no_id = {"method": "method", "position": "position", "key": "key", "secret": "secret", "intended_for":"Mickey Mouse"}
-        #TODO insert useful values in parameters
+        parameters_no_id = {"method": "robust-xmp", "position": "metadata-only", "key": "key", "secret": "secret", "intended_for":"Mickey Mouse"}
         resp = client.post("/api/create-watermark", json=parameters)
-        #resp = client.post("/create-watermark/0", json=parameters_no_id)
+        #resp = client.post("/apicreate-watermark/1", json=parameters_no_id)
         data = resp.get_json()
 
         #basic tests
@@ -245,15 +244,26 @@ def test_get_watermarking_methods_route(client):
 
 def test_read_watermark_route(client):
     """Test read watermark endpoint."""
-    parameters = {"method": "method", "position": "position", "key": "key", "id": 1}
-    parameters_no_id = {"method": "method", "position": "position", "key": "key"}
-    #TODO insert useful values in parameters
+    #Upload watermarked file to the app
+    with open("storage\\files\\username\\watermarked.pdf", "rb") as f:
+        data = {
+            "file": (f, "watermarked.pdf"),
+            "name": "Water File"
+        }
+        upload_resp = client.post("/api/upload-document", data=data, content_type='multipart/form-data')
+        upload_resp_data = upload_resp.get_json()
+        assert upload_resp.status_code == 201
+        assert upload_resp_data.get("id") == 2
+    #Test the route
+
+    parameters = {"method": "overlay-watermark", "position": "metadata-only", "key": "strong-password", "id": 2}
+    parameters_no_id = {"method": "overlay-watermark", "position": "metadata-only", "key": "strong-password"}
     resp = client.post("/api/read-watermark", json=parameters)
-    #resp = client.post("/read-watermark/1", json=parameters_no_id)
+    #resp = client.post("/api/read-watermark/2", json=parameters_no_id)
     data = resp.get_json()
 
     #basic tests
-    assert resp.status_code == 200
+    assert resp.status_code == 201
     assert resp.is_json
     #check types
     assert isinstance(data.get("documentid"), int)
