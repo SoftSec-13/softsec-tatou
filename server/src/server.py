@@ -45,7 +45,7 @@ def create_app():
     app = Flask(__name__)
 
     # --- Config ---
-    app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-change-me")
+    app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "new-dev-secret-change-me")
     app.config["STORAGE_DIR"] = Path(
         os.environ.get("STORAGE_DIR", "./storage")
     ).resolve()
