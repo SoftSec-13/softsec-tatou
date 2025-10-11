@@ -17,8 +17,8 @@ def save_pdf(path: str, data: bytes):
 
 
 def main():
-    input_pdf_path = "input.pdf"  # ✅ PDF path
-    output_pdf_path = "watermarked.pdf"  # ✅ Output file path
+    input_pdf_path = "server\\test\\storage\\files\\username\\input.pdf"  # ✅ PDF path
+    output_pdf_path = "server\\test\\storage\\files\\username\\watermarked.pdf"  # ✅ Output file path
     hidden_val = "hidden-example-value"  # nosec
     key = "strong-password"
 
