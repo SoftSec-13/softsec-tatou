@@ -20,7 +20,7 @@ groups:
             relativeTimeRange:
               from: 300
               to: 0
-            datasourceUid: prometheus_ds
+            datasourceUid: PBFA97CFB590B2093
             model:
               editorMode: code
               expr: |
@@ -33,7 +33,7 @@ groups:
             relativeTimeRange:
               from: 300
               to: 0
-            datasourceUid: prometheus_ds
+            datasourceUid: PBFA97CFB590B2093
             model:
               editorMode: code
               expr: |
@@ -78,7 +78,7 @@ groups:
             relativeTimeRange:
               from: 300
               to: 0
-            datasourceUid: prometheus_ds
+            datasourceUid: PBFA97CFB590B2093
             model:
               editorMode: code
               expr: |
@@ -125,7 +125,7 @@ groups:
             relativeTimeRange:
               from: 300
               to: 0
-            datasourceUid: prometheus_ds
+            datasourceUid: PBFA97CFB590B2093
             model:
               editorMode: code
               expr: |
@@ -172,7 +172,7 @@ groups:
             relativeTimeRange:
               from: 900
               to: 0
-            datasourceUid: prometheus_ds
+            datasourceUid: PBFA97CFB590B2093
             model:
               editorMode: code
               expr: |
@@ -220,7 +220,7 @@ groups:
             relativeTimeRange:
               from: 3600
               to: 0
-            datasourceUid: prometheus_ds
+            datasourceUid: PBFA97CFB590B2093
             model:
               editorMode: code
               expr: |
@@ -267,7 +267,7 @@ groups:
             relativeTimeRange:
               from: 600
               to: 0
-            datasourceUid: prometheus_ds
+            datasourceUid: PBFA97CFB590B2093
             model:
               editorMode: code
               expr: |
@@ -313,7 +313,7 @@ groups:
             relativeTimeRange:
               from: 300
               to: 0
-            datasourceUid: prometheus_ds
+            datasourceUid: PBFA97CFB590B2093
             model:
               editorMode: code
               expr: |
@@ -360,7 +360,7 @@ groups:
             relativeTimeRange:
               from: 300
               to: 0
-            datasourceUid: prometheus_ds
+            datasourceUid: PBFA97CFB590B2093
             model:
               editorMode: code
               expr: |
@@ -407,7 +407,7 @@ groups:
             relativeTimeRange:
               from: 1800
               to: 0
-            datasourceUid: prometheus_ds
+            datasourceUid: PBFA97CFB590B2093
             model:
               editorMode: code
               expr: |
@@ -460,7 +460,7 @@ groups:
             relativeTimeRange:
               from: 600
               to: 0
-            datasourceUid: loki_ds
+            datasourceUid: P982945308D3682D1
             model:
               editorMode: builder
               expr: |
@@ -506,7 +506,7 @@ groups:
             relativeTimeRange:
               from: 600
               to: 0
-            datasourceUid: loki_ds
+            datasourceUid: P982945308D3682D1
             model:
               editorMode: code
               expr: |
