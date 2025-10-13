@@ -3,7 +3,9 @@ from pathlib import Path
 import json
 from datetime import datetime
 from io import BytesIO
-from unittest.mock import patch
+import os
+from werkzeug.datastructures import FileStorage
+from unittest.mock import patch, PropertyMock
 from flask import g, request
 
 # Add the src directory to the Python path
@@ -60,6 +62,27 @@ def test_create_user_route(client):
     assert resp_data.get("login") == parameters["login"]
     assert resp_data.get("email") == parameters["email"]
 
+    #Test with missing parameters
+    # Missing email
+    resp = client.post("/api/create-user",json={
+                "login": "username",
+                "password": "password",
+            },  # pragma: allowlist secret
+    )
+    assert resp.status_code == 400
+
+    # Missing login
+    resp = client.post("/api/create-user",
+            json={"email": "user@email.se", "password": "password"},
+    )
+    assert resp.status_code == 400
+
+    # Missing password
+    resp = client.post(
+    "/api/create-user", json={"email": "user@email.se", "login": "username"}
+    )
+    assert resp.status_code == 400
+
 
 def test_login_route(client):
     """Test login endpoint."""
@@ -82,28 +105,28 @@ def test_login_route(client):
     #check val
     assert resp_data.get("token_type") == "bearer"
 
+    #Test with missing parameters
+    # Missing email
+    resp = client.post("/api/login", json={"password": "password"})
+    assert resp.status_code == 400
+    # Missing password
+    resp = client.post("/api/login", json={"email": "user@email.se"})
+    assert resp.status_code == 400
+    # Both missing
+    resp = client.post("/api/login", json={})
+    assert resp.status_code == 400
 
 def test_upload_document_route(client):
     """Test document upload endpoint."""
-    # This endpoint might be commented out in the current server implementation
-    # Let's test if it exists
-    #create dummy file
-    #pdf_file = (BytesIO(b"%PDF-1.4 dummy pdf content"), "test_document.pdf")
-    #parameters = {"file":pdf_file, "name":"My File"}
+    #open dummy file
     with open("storage\\files\\username\\input.pdf", "rb") as f:
         parameters = {
             "file": (f, "input.pdf"),
             "name": "My File"
         }
-    #parameters = {
-    #"file": (BytesIO(b"%PDF-1.4 dummy pdf content"), "test_document.pdf"),
-    #"name": "My File",
-    #}
+
         resp = client.post("/api/upload-document", data=parameters, content_type='multipart/form-data')
         resp_data = resp.get_json()
-
-        # Should return 404 if route is commented out, or other error if route exists
-        #assert resp.status_code in [404, 400, 405, 500]  # Various expected error codes
 
         #tests when fully functional
         #basic tests
@@ -117,6 +140,35 @@ def test_upload_document_route(client):
         assert isinstance(resp_data.get("size"), int) 
         #check value
         assert resp_data.get("name") == parameters["name"]
+
+    #Test with missing file
+    resp = client.post("/api/upload-document")
+    assert resp.status_code == 400
+
+    #Test with too big file, 51 Mb
+    content = b"%PDF-1.4\n" + b"0" * (50 * 1024 * 1024 + 1)  # 50MB + 1 byte  
+    stream = BytesIO(content)
+    file_storage = FileStorage(stream=stream, filename="bigfile.pdf", content_type="application/pdf")
+
+    #Need to patch the content length, not included in flask test server
+    with patch.object(FileStorage, 'content_length', new_callable=PropertyMock) as mock_content_length:
+        mock_content_length.return_value = len(content)
+
+        data = {
+            'file': (file_storage.stream, file_storage.filename, file_storage.content_type),
+            'name': 'My Big File'
+        }
+        resp = client.post("/api/upload-document", data=data, content_type='multipart/form-data')
+        assert resp.status_code == 413
+
+    #Test with type error, txt file
+    resp = client.post("/api/upload-document", 
+                       data={'file': (BytesIO(b"example"), "test.txt", "text/plain"),
+                        'name': 'file'},
+                        content_type='multipart/form-data')
+    assert resp.status_code == 415
+
+
 
 def test_list_documents_route(client):
     """Test document list endpoint."""
@@ -163,6 +215,16 @@ def test_list_versions_route(client):
         assert isinstance(elem.get("secret"), str) 
         assert isinstance(elem.get("method"), str) 
 
+    #Test with no parameters
+    resp = client.get("/api/list-versions") 
+    assert resp.status_code == 400
+    #Test with json parameters
+    resp = client.get("/api/list-versions", json = parameters) 
+    assert resp.status_code == 400
+    #Test with wrong parameters (missing file)
+    resp = client.get("/api/list-versions", query_string = {'documentid': 4}) 
+    assert resp.status_code == 404
+
 
 def test_list_all_versions_route(client):
     """Test list all versions endpoint."""
@@ -197,12 +259,19 @@ def test_get_document_route(client):
     # Check Content-Disposition for 'inline'
     content_disposition = resp.headers.get('Content-Disposition', '')
     is_inline = 'inline' in content_disposition.lower()
-    # Check if the body starts with PDF signature
-    #is_binary_pdf = resp.content.startswith(b'%PDF-')
     #Oracle
     assert is_pdf
     assert is_inline
-    #assert is_binary_pdf
+
+    #Test with no parameters
+    resp = client.get("/api/get-document") 
+    assert resp.status_code == 400
+    #Test with json parameters
+    resp = client.get("/api/get-document", json = parameters) 
+    assert resp.status_code == 400
+    #Test with wrong parameters (missing file)
+    resp = client.get("/api/get-document", query_string = {'documentid': 4}) 
+    assert resp.status_code == 404
 
 def test_get_watermarking_methods_route(client):
     """Test get watermarking methods endpoint."""
@@ -224,7 +293,8 @@ def test_create_watermark_route(client):
     """Test create watermark endpoint."""
     parameters = {"method": "robust-xmp", "position": "metadata-only", "key": "key", 
                     "secret": "secret", "intended_for":"Mickey Mouse", "id": 1}
-    parameters_no_id = {"method": "robust-xmp", "position": "metadata-only", "key": "key", "secret": "secret", "intended_for":"Mickey Mouse"}
+    parameters_no_id = {"method": "robust-xmp", "position": "metadata-only", "key": "key", 
+                        "secret": "secret", "intended_for":"Mickey Mouse"}
     resp = client.post("/api/create-watermark", json=parameters)
     #resp = client.post("/apicreate-watermark/1", json=parameters_no_id)
     data = resp.get_json()
@@ -246,6 +316,45 @@ def test_create_watermark_route(client):
     assert data.get("intended_for") == parameters["intended_for"]
     assert data.get("method") == parameters["method"]
     assert data.get("position") == parameters["position"]
+
+    #Tests with wrong parameters
+    #Test with exact same call: should return database insertion error (Non unique entry)
+    resp = client.post("/api/create-watermark", json=parameters)
+    assert resp.status_code == 503
+    #Non existant method
+    resp = client.post("/api/create-watermark", json={"method": "watermarkmethod", "position": "metadata-only", "key": "key", 
+                    "secret": "secret", "intended_for":"Mickey Mouse", "id": 1})
+    assert resp.status_code == 400
+    #Non existant document
+    resp = client.post("/api/create-watermark", json={"method": "robust-xmp", "position": "metadata-only", "key": "key", 
+                    "secret": "secret", "intended_for":"Mickey Mouse", "id": 8})
+    assert resp.status_code == 404
+    #Missing id
+    resp = client.post("/api/create-watermark", json={"method": "robust-xmp", "position": "metadata-only", "key": "key", 
+                    "secret": "secret", "intended_for":"Mickey Mouse"})
+    assert resp.status_code == 400
+    #Missing method
+    resp = client.post("/api/create-watermark", json={"position": "metadata-only", "key": "key", 
+                    "secret": "secret", "intended_for":"Mickey Mouse", "id": 1})
+    assert resp.status_code == 400
+    #Missing position: no issue if method ignores 
+    # (NB: must change intended_for or secret etc! Else integrity error.)
+    resp = client.post("/api/create-watermark", json={"method": "overlay-watermark", "key": "key", 
+                    "secret": "secret", "intended_for":"John", "id": 1})
+    assert resp.status_code == 201
+    #Missing key
+    resp = client.post("/api/create-watermark", json={"method": "robust-xmp", "position": "metadata-only",
+                    "secret": "secret", "intended_for":"Mickey Mouse", "id": 1})
+    assert resp.status_code == 400
+    #Missing secret
+    resp = client.post("/api/create-watermark", json={"method": "robust-xmp", "position": "metadata-only", "key": "key", 
+                     "intended_for":"Mickey Mouse", "id": 1})
+    assert resp.status_code == 400
+    #Missing recipient
+    resp = client.post("/api/create-watermark", json={"method": "robust-xmp", "position": "metadata-only", "key": "key", 
+                    "secret": "secret",  "id": 1})
+    assert resp.status_code == 400
+
 
 def test_read_watermark_route(client):
     """Test read watermark endpoint."""
@@ -280,8 +389,45 @@ def test_read_watermark_route(client):
     assert data.get("method") == parameters["method"]
     assert data.get("position") == parameters["position"]
 
+    #Tests with wrong parameters
+    #Non existant id
+    resp = client.post("/api/read-watermark", json={"method": "overlay-watermark", 
+                                                    "position": "metadata-only", 
+                                                    "key": "strong-password", "id": 8})
+    assert resp.status_code == 404
+    #Missing id
+    resp = client.post("/api/read-watermark", json={"method": "overlay-watermark", 
+                                                    "position": "metadata-only", 
+                                                    "key": "strong-password"})
+    assert resp.status_code == 400
+    #Missing method
+    resp = client.post("/api/read-watermark", json={"position": "metadata-only", 
+                                                    "key": "strong-password", "id": 2})
+    assert resp.status_code == 400
+    #Missing position (no problem)
+    resp = client.post("/api/read-watermark", json={"method": "overlay-watermark", 
+                                                    "key": "strong-password", "id": 2})
+    assert resp.status_code == 201
+    #Missing key
+    resp = client.post("/api/read-watermark", json={"method": "overlay-watermark", 
+                                                    "position": "metadata-only", 
+                                                    "id": 2})
+    assert resp.status_code == 400
+
+
 def test_delete_document_route(client):
     document_id = {"id": 2}
     resp = client.delete("/api/delete-document", json=document_id)
+    #resp = client.delete("/api/delete-document/2")
 
     assert resp.status_code == 200
+    #Test file is deleted
+    resp_deletion = client.get("/api/get-document/2")
+    assert resp_deletion.status_code == 404
+
+    #Test missing id
+    resp = client.delete("/api/delete-document/")
+    assert resp_deletion.status_code == 404
+    #Test missing file
+    resp = client.delete("/api/delete-document/2")
+    assert resp_deletion.status_code == 404
