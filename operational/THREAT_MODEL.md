@@ -12,7 +12,8 @@ Scope: Deployed PDF watermarking service (Flask API + MariaDB + watermarking met
 - Source code & watermarking method implementations
 - Logging & telemetry data (may contain metadata, IPs)
 - Falco runtime alerts and custom rule definitions (sensitive operational intel)
- - Input validation logic & regex patterns (email/login format) – protects against malformed account creation attempts
+- Input validation logic & regex patterns (email/login format) – protects against malformed account creation attempts
+- Docker volume backup archives (`tar.gz`) produced by `operational/backup.sh` (contain copies of persistent data)
 
 ## 2. Trust Boundaries
 - Internet client -> Flask HTTP interface
@@ -59,6 +60,9 @@ Scope: Deployed PDF watermarking service (Flask API + MariaDB + watermarking met
 | Information Disclosure | Metrics endpoint token brute force / enumeration | Learn that /metrics exists & scrape internal telemetry | Header secret required; returns 404 on failure (security by obscurity) – consider rate limiting & distinct 403 in future |
 | Information Disclosure | /healthz reveals DB connectivity | Assist attacker in timing DB outages / maintenance | Limited data |
 | Tampering | Abuse of position parameter (future methods) | Inject unexpected placement logic | Applicability check via is_watermarking_applicable |
+| Information Disclosure | Theft of backup archives (`tar.gz`) | Archives contain copied data (documents, DB volume); offline analysis of secrets | Restrict filesystem perms (root-only), optional off-host storage; monitor unexpected archive exfil in logs |
+| Tampering | Modification / deletion of backup archives | Breaks recovery chain or injects poisoned data | Retention script logs deletions; consider future integrity hashes & separate write/read roles |
+| DoS | Backup I/O contention during peak usage | Slower DB or watermark operations while tar runs | Schedule off-peak (cron 01:00), keep archives compressed |
 
 ## 6. Selected Observation Points
 1. HTTP request latency histogram `tatou_http_request_duration_seconds` & counter `tatou_http_requests_total` (labels: method, route, status) – spike & saturation detection.
@@ -79,6 +83,8 @@ Scope: Deployed PDF watermarking service (Flask API + MariaDB + watermarking met
 - Secrets in memory not redacted from debug tracebacks (intentional for course scope).
 - No metric for per-user 404 rate (derive from logs; avoid high-cardinality metric labels).
 - Metrics endpoint relies on static shared header token; no rotation or per-operator scoping (risk: accidental leak in client tooling).
+- Backups: present but unencrypted, same-host only, no integrity hash or automated restore verification.
+- No alerting for backup failures / missing expected daily archive.
 
 ## 8. Abuse Cases & Detection Strategy
 | Abuse Case | Signal | Metric / Log | Threshold |
@@ -109,5 +115,26 @@ Provisioned in `grafana/provisioning/alerting/alerts.yaml` (unified alerting). E
 | tatou_falco_high_priority | Critical Falco alert | any critical in 10m | Container breakout attempt |
 | tatou_shell_detection | Shell spawned indicator | any in 10m | Container breakout attempt |
 
-## 10. Residual Risk
-Given academic scope, residual risks (token theft, DoS, limited obfuscation of /metrics) remain accepted. Logging, metrics (including body size & suspicious events), and Falco runtime alerts provide richer detection, but Falco runs privileged and depends on timely rule/driver updates to avoid becoming a liability. Lack of rate limiting and static metrics token are conscious trade-offs for simplicity.
+## 10. Backup & Recovery Strategy
+Implemented daily volume snapshot script `operational/backup.sh` (cron used off‑peak e.g. 01:00). The script:
+1. Enumerates Docker volumes (or allowlist via VOLUMES env).
+2. Resolves each volume mountpoint (`docker volume inspect`).
+3. Creates compressed archives `backup_root/<vol>/<vol>-<timestamp>.tar.gz` (default root: `/var/backups/docker-volumes`).
+4. Prunes archives older than RETENTION_DAYS (default 7) via `find -mtime`.
+
+Recovery Path:
+- Single volume restore: create empty volume, extract latest archive with `tar -xzf` into mountpoint (or via temporary helper container).
+- Application-level regeneration: Watermarked PDFs can be deterministically re-generated from original uploads + stored metadata if needed; backups primarily protect against total storage or host loss.
+
+Security Considerations:
+- Archives inherit underlying data sensitivity.
+- Currently stored unencrypted on same host; compromise of host -> compromise of backups (no defense-in-depth).
+- Tampering not cryptographically detected (no hashes/signatures recorded).
+- Backup process requires root (reads `/var/lib/docker/volumes/...`); misuse of script could exfiltrate data.
+
+Performance / Availability:
+- Potential I/O contention mitigated by off‑peak scheduling; archive compression shortens retention footprint.
+- No incremental or differential strategy; full tar each run (acceptable for current dataset size, revisit on growth).
+
+## 11. Residual Risk
+Given academic scope, residual risks (token theft, DoS, limited obfuscation of /metrics) remain accepted. New backup capability reduces RPO for volume loss to <24h (daily schedule) but leaves risks: archive theft (unencrypted), silent corruption (no integrity attest), and same-host failure window until offsite replication exists. Logging, metrics (including body size & suspicious events), Falco runtime alerts, and deterministic watermark regeneration provide layered detection & manual recovery. Lack of rate limiting and static metrics token are conscious trade-offs for simplicity.
