@@ -169,4 +169,4 @@ class StructuralOverlay(WatermarkingMethod):
             else:
                 extracted_data.append(None)  # No watermark found on this page
 
-        return str(extracted_data)
+        return str(extracted_data[0])
