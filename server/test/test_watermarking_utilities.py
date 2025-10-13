@@ -1,9 +1,3 @@
-"""Tests for watermarking utility functions and PDF exploration.
-
-Tests the watermarking_utils module functions that don't require
-database connectivity, focusing on PDF processing and method registry.
-"""
-
 import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -44,6 +38,7 @@ class TestWatermarkingUtils:
         assert len(WMUtils.METHODS) > 0
 
         # Check for expected methods from the imports (using actual names)
+        
         #Default unsafe methods have been removed
         #assert "toy-eof" in WMUtils.METHODS
         #assert "bash-bridge-eof" in WMUtils.METHODS
