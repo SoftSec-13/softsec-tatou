@@ -44,8 +44,12 @@ class TestWatermarkingUtils:
         assert len(WMUtils.METHODS) > 0
 
         # Check for expected methods from the imports (using actual names)
-        assert "toy-eof" in WMUtils.METHODS
-        assert "bash-bridge-eof" in WMUtils.METHODS
+        #Default unsafe methods have been removed
+        #assert "toy-eof" in WMUtils.METHODS
+        #assert "bash-bridge-eof" in WMUtils.METHODS
+        assert "robust-xmp" in WMUtils.METHODS
+        assert "overlay-watermark" in WMUtils.METHODS
+        assert "signed-annots" in WMUtils.METHODS
 
         # Verify all registered methods are WatermarkingMethod instances
         for _name, method in WMUtils.METHODS.items():
