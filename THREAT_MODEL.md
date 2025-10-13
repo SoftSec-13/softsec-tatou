@@ -101,7 +101,36 @@ Scope: Deployed PDF watermarking service (Flask API + MariaDB + watermarking met
 ## 9. Residual Risk
 Given academic scope, residual risks (token theft, DoS, limited obfuscation of /metrics) remain accepted. Logging, metrics (including body size & suspicious events), and Falco runtime alerts provide richer detection, but Falco runs privileged and depends on timely rule/driver updates to avoid becoming a liability. Lack of rate limiting and static metrics token are conscious trade-offs for simplicity.
 
+## 10. Grafana Alerting Rules
+Provisioned in `grafana/provisioning/alerting/alerts.yaml` (unified alerting). Each rule maps to abuse cases or observation points above.
+
+| Rule UID | Purpose | Default Threshold | Threat Model Link |
+|----------|---------|-------------------|-------------------|
+| tatou_api_latency_p95 | Detect elevated p95 API latency | p95 > 0.5s for 5m | DoS / performance degradation |
+| tatou_api_errors_spike | 5xx error ratio high | >5% 5xx over 5m | Backend instability / emerging fault |
+| tatou_login_bruteforce | Brute force login | >50 failures /5m | Brute force abuse |
+| tatou_watermark_fail_ratio | Watermark failures >5% | >5% over 15m | Fuzzing / method regression |
+| tatou_version_404_guessing | Link guessing | >200 404s /1h | Secret guessing of version links |
+| tatou_upload_volume_spike | Storage flood attempt | 10m bytes >2x prior 10m | Storage flood / DoS |
+| tatou_db_error_spike | DB error surge | >5 errors /5m | SQLi attempts / DB outage |
+| tatou_suspicious_event_rate | Input probing | >20 events /5m | Probing / reconnaissance |
+| tatou_watermark_read_to_create_ratio | Enumeration of watermarks | read/create >10 /30m | Enumeration abuse |
+| tatou_falco_high_priority | Critical Falco alert | any critical in 10m | Container breakout attempt |
+| tatou_shell_detection | Shell spawned indicator | any in 10m | Container breakout attempt |
+
+Tuning Guidance:
+- Establish baseline first (observe at least 24h) and recalibrate static thresholds to minimize false positives (<1 non-actionable alert/day).
+- Consider dynamic ratios (e.g., failed_logins / total_logins) if workload highly variable.
+- Latency alert currently global; add route label segmentation if specific endpoints need tighter SLOs.
+- Combine multiple consecutive evaluations (for durations already set) to reduce flapping.
+- For production, add notification policies (Slack/Email/Pager) in Grafana UI; repository does not provision contacts.
+
+Extension Steps:
+1. Add rule under the relevant group in `alerts.yaml` using `prometheus_ds` (metrics) or `loki_ds` (logs).
+2. Keep evaluation interval aligned with Prometheus `evaluation_interval` (1m) unless strong reason otherwise.
+3. Update this table and, if new threat class, expand STRIDE or Abuse sections.
+
 ---
 Updated to reflect refined metrics instrumentation (additional histograms & counters) leveraging existing Prometheus + Loki + Falco stack.
 
-Revision notes (2025-10-13): Added /healthz and /metrics endpoint considerations, expanded STRIDE table with metrics & health check disclosure threats, documented new input validation asset, enumerated current suspicious event reasons, and noted gaps around static metrics token & absent rate limiting.
+Revision notes (2025-10-13): Added /healthz and /metrics endpoint considerations, expanded STRIDE table with metrics & health check disclosure threats, documented new input validation asset, enumerated current suspicious event reasons, noted gaps around static metrics token & absent rate limiting, and migrated Grafana alerting documentation into this file (section 10).

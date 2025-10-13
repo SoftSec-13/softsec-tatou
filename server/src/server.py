@@ -376,9 +376,9 @@ def create_app():
                     ),
                     {"id": did},
                 ).one()
-        except Exception as e:
+        except Exception:
             stored_path.unlink(missing_ok=True)
-            app.logger.error(f"Database error: {str(e)}")
+            app.logger.error(f"Database error: {stored_path}, {int(g.user['id'])}")
             inc_db_error("insert_document")
             return jsonify({"error": "database error occurred"}), 503
 
@@ -412,8 +412,8 @@ def create_app():
                     ),
                     {"uid": int(g.user["id"])},
                 ).all()
-        except Exception as e:
-            app.logger.error(f"Database error in list_documents: {str(e)}")
+        except Exception:
+            app.logger.error(f"Database error in list_documents: {g.user['id']}")
             inc_db_error("list_documents")
             return jsonify({"error": "An error occurred while fetching documents"}), 503
 
@@ -479,8 +479,10 @@ def create_app():
                     """),
                     {"did": document_id, "uid": int(g.user["id"])},
                 ).all()
-        except Exception as e:
-            app.logger.error(f"Database error in list_versions: {str(e)}")
+        except Exception:
+            app.logger.error(
+                f"Database error in list_versions: {document_id},{g.user['id']}"
+            )
             inc_db_error("list_versions")
             return jsonify({"error": "An error occurred while fetching versions"}), 503
 
@@ -524,8 +526,8 @@ def create_app():
         except ValueError:
             app.logger.error("Invalid user ID in auth token")
             return jsonify({"error": "Authentication error"}), 401
-        except Exception as e:
-            app.logger.error(f"Database error in list_all_versions: {str(e)}")
+        except Exception:
+            app.logger.error(f"Database error in list_all_versions: {g.user['id']}")
             inc_db_error("list_all_versions")
             return jsonify({"error": "An error occurred while fetching versions"}), 503
 
@@ -568,8 +570,10 @@ def create_app():
                     ),
                     {"id": document_id, "uid": int(g.user["id"])},
                 ).first()
-        except Exception as e:
-            app.logger.error(f"Database error in get_document: {str(e)}")
+        except Exception:
+            app.logger.error(
+                f"Database error in get_document: {document_id},{g.user['id']}"
+            )
             inc_db_error("get_document")
             return jsonify(
                 {"error": "An error occurred while fetching the document"}

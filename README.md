@@ -78,6 +78,8 @@ sudo docker compose -f docker-compose.prod.yml up -d
 2. Login with admin:admin
 3. To view Dashboards, go to Home->Dashboards->Flask Gunicorn Logs & Metrics
 
+
+
 ## Environment Setup
 
 To run or build the project, you need to set up environment variables in a `.env` file at the project root. You can use the provided `.env.sample` as a template:
