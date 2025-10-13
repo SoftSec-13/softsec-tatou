@@ -225,11 +225,9 @@ def test_create_watermark_route(client):
     parameters = {"method": "robust-xmp", "position": "metadata-only", "key": "key", 
                     "secret": "secret", "intended_for":"Mickey Mouse", "id": 1}
     parameters_no_id = {"method": "robust-xmp", "position": "metadata-only", "key": "key", "secret": "secret", "intended_for":"Mickey Mouse"}
-    print(client.application.url_map)
     resp = client.post("/api/create-watermark", json=parameters)
     #resp = client.post("/apicreate-watermark/1", json=parameters_no_id)
     data = resp.get_json()
-    print(data)
 
     #basic tests
     assert resp.status_code == 201
@@ -282,3 +280,8 @@ def test_read_watermark_route(client):
     assert data.get("method") == parameters["method"]
     assert data.get("position") == parameters["position"]
 
+def test_delete_document_route(client):
+    document_id = {"id": 2}
+    resp = client.delete("/api/delete-document", json=document_id)
+
+    assert resp.status_code == 200
