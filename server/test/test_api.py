@@ -88,30 +88,35 @@ def test_upload_document_route(client):
     # This endpoint might be commented out in the current server implementation
     # Let's test if it exists
     #create dummy file
-    pdf_file = (BytesIO(b"%PDF-1.4 dummy pdf content"), "test_document.pdf")
+    #pdf_file = (BytesIO(b"%PDF-1.4 dummy pdf content"), "test_document.pdf")
     #parameters = {"file":pdf_file, "name":"My File"}
-    parameters = {
-    "file": (BytesIO(b"%PDF-1.4 dummy pdf content"), "test_document.pdf"),
-    "name": "My File",
-    }
-    resp = client.post("/api/upload-document", data=parameters, content_type='multipart/form-data')
-    resp_data = resp.get_json()
+    with open("storage\\files\\username\\input.pdf", "rb") as f:
+        parameters = {
+            "file": (f, "input.pdf"),
+            "name": "My File"
+        }
+    #parameters = {
+    #"file": (BytesIO(b"%PDF-1.4 dummy pdf content"), "test_document.pdf"),
+    #"name": "My File",
+    #}
+        resp = client.post("/api/upload-document", data=parameters, content_type='multipart/form-data')
+        resp_data = resp.get_json()
 
-    # Should return 404 if route is commented out, or other error if route exists
-    #assert resp.status_code in [404, 400, 405, 500]  # Various expected error codes
+        # Should return 404 if route is commented out, or other error if route exists
+        #assert resp.status_code in [404, 400, 405, 500]  # Various expected error codes
 
-    #tests when fully functional
-    #basic tests
-    assert resp.status_code == 201
-    assert resp.is_json
-    #check types
-    assert isinstance(resp_data.get("id"), int) #was string! Specification is wrong.
-    assert isinstance(resp_data.get("name"), str) 
-    assert isinstance(resp_data.get("creation"), str) and datetime.fromisoformat(resp_data.get("creation"))
-    assert isinstance(resp_data.get("sha256"), str) 
-    assert isinstance(resp_data.get("size"), int) 
-    #check value
-    assert resp_data.get("name") == parameters["name"]
+        #tests when fully functional
+        #basic tests
+        assert resp.status_code == 201
+        assert resp.is_json
+        #check types
+        assert isinstance(resp_data.get("id"), int) #was string! Specification is wrong.
+        assert isinstance(resp_data.get("name"), str) 
+        assert isinstance(resp_data.get("creation"), str) and datetime.fromisoformat(resp_data.get("creation"))
+        assert isinstance(resp_data.get("sha256"), str) 
+        assert isinstance(resp_data.get("size"), int) 
+        #check value
+        assert resp_data.get("name") == parameters["name"]
 
 def test_list_documents_route(client):
     """Test document list endpoint."""
@@ -216,31 +221,33 @@ def test_get_watermarking_methods_route(client):
         assert isinstance(methods[i].get("name"), str)
 
 def test_create_watermark_route(client):
-        """Test create watermark endpoint."""
-        parameters = {"method": "robust-xmp", "position": "metadata-only", "key": "key", 
+    """Test create watermark endpoint."""
+    parameters = {"method": "robust-xmp", "position": "metadata-only", "key": "key", 
                     "secret": "secret", "intended_for":"Mickey Mouse", "id": 1}
-        parameters_no_id = {"method": "robust-xmp", "position": "metadata-only", "key": "key", "secret": "secret", "intended_for":"Mickey Mouse"}
-        resp = client.post("/api/create-watermark", json=parameters)
-        #resp = client.post("/apicreate-watermark/1", json=parameters_no_id)
-        data = resp.get_json()
+    parameters_no_id = {"method": "robust-xmp", "position": "metadata-only", "key": "key", "secret": "secret", "intended_for":"Mickey Mouse"}
+    print(client.application.url_map)
+    resp = client.post("/api/create-watermark", json=parameters)
+    #resp = client.post("/apicreate-watermark/1", json=parameters_no_id)
+    data = resp.get_json()
+    print(data)
 
-        #basic tests
-        assert resp.status_code == 201
-        assert resp.is_json
-        #check types
-        assert isinstance(data.get("id"), int)
-        assert isinstance(data.get("documentid"), int)
-        assert isinstance(data.get("link"), str)
-        assert isinstance(data.get("intended_for"), str)
-        assert isinstance(data.get("method"), str)
-        assert isinstance(data.get("position"), str)
-        assert isinstance(data.get("filename"), str)
-        assert isinstance(data.get("size"), int)
-        #check values
-        assert data.get("documentid") == parameters["id"]
-        assert data.get("intended_for") == parameters["intended_for"]
-        assert data.get("method") == parameters["method"]
-        assert data.get("position") == parameters["position"]
+    #basic tests
+    assert resp.status_code == 201
+    assert resp.is_json
+    #check types
+    assert isinstance(data.get("id"), int)
+    assert isinstance(data.get("documentid"), int)
+    assert isinstance(data.get("link"), str)
+    assert isinstance(data.get("intended_for"), str)
+    assert isinstance(data.get("method"), str)
+    assert isinstance(data.get("position"), str)
+    assert isinstance(data.get("filename"), str)
+    assert isinstance(data.get("size"), int)
+    #check values
+    assert data.get("documentid") == parameters["id"]
+    assert data.get("intended_for") == parameters["intended_for"]
+    assert data.get("method") == parameters["method"]
+    assert data.get("position") == parameters["position"]
 
 def test_read_watermark_route(client):
     """Test read watermark endpoint."""
