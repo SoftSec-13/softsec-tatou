@@ -11,7 +11,7 @@ set DB_NAME=tatou
 set TOKEN_TTL_SECONDS=3600
 
 REM Wait for DB to be ready
-timeout /t 5 >nul
+timeout /t 10 >nul
 
 REM Run tests
 pytest
