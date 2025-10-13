@@ -91,6 +91,7 @@ Edit `.env` and fill in the required values:
 - `MARIADB_ROOT_PASSWORD`: Root password for MariaDB
 - `MARIADB_USER`: Database user (default: tatou)
 - `MARIADB_PASSWORD`: Database password (default: tatou)
+- `SECRET_KEY`: Flask secret key
 - `GITHUB_TOKEN`: GitHub token for accessing private dependencies during Docker builds (required)
 - `DOCKERHUB_USER`: Prod only, access to container registry
 - `DOCKERHUB_PASSWORD`: Prod only, access to container registry
@@ -101,6 +102,7 @@ Example `.env.sample`:
 MARIADB_ROOT_PASSWORD=your_root_password
 MARIADB_USER=tatou
 MARIADB_PASSWORD=tatou
+SECRET_KEY=flask-key
 GITHUB_TOKEN=your_github_token_here
 
 #For production, required:
