@@ -45,7 +45,7 @@ def create_app(testing=False):
     app = Flask(__name__)
 
     # --- Config ---
-    app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-change-me")
+    app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "new-dev-secret-change-me")
     app.config["STORAGE_DIR"] = Path(
         os.environ.get("STORAGE_DIR", "./storage")
     ).resolve()
@@ -83,7 +83,7 @@ def create_app(testing=False):
 
     # --- Helpers ---
     def _serializer():
-        return URLSafeTimedSerializer(app.config["SECRET_KEY"], salt="tatou-auth")
+        return URLSafeTimedSerializer(app.config["SECRET_KEY"], salt="ljkdsad123123kjd")
 
     def _auth_error(msg: str, code: int = 401):
         return jsonify({"error": msg}), code
