@@ -1,4 +1,6 @@
 #!/bin/bash
+
+#You can make this file into a shell file
 #To test the API
     docker compose down -v db
     docker compose up -d db
@@ -17,8 +19,12 @@
     set DB_NAME=tatou
     set TOKEN_TTL_SECONDS=3600
 
-    sleep 10
+    sleep 5
     python -m pytest -vv test_api.py
 
 #All else
     python -m pytest -vv <test_file_name>
+
+#Run all tests: on Windows: .\run_tests.bat
+
+Mutation: mutmut run --runner "run_tests.bat"
