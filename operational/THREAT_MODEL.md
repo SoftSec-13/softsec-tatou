@@ -97,6 +97,8 @@ Scope: Deployed PDF watermarking service (Flask API + MariaDB + watermarking met
 | Watermark fuzzing / exploit attempt | Spike in failures & duration tail | tatou_watermarks_failed_total + p95 watermark_duration | Failures >5% + p95 > baseline*2 |
 | SQL injection attempts | DB error spike | tatou_db_errors_total | > baseline + 3σ |
 | Container breakout attempt | Falco rule trigger (e.g. Terminal shell, Tatou storage write) | Loki `{container="/falco"}` stream | Any high-priority alert |
+| Metrics endpoint probing | Many 404s with X-Metrics-Token header variations | Access logs (path=/metrics) | >50 distinct attempts in 10m |
+| Health check scraping | Elevated /healthz frequency from single IP | Access logs (path=/healthz) | >120/min (beyond normal monitoring) |
 
 ## 9. Grafana Alerting Rules
 Provisioned in `grafana/provisioning/alerting/alerts.yaml` (unified alerting). Each rule maps to abuse cases or observation points above.
