@@ -5,11 +5,13 @@ set -euo pipefail
 # Configuration
 FUZZ_TIME="${FUZZ_TIME:-300}"
 MAX_LEN="${MAX_LEN:-5000}"
+TIMEOUT="${FUZZ_TIMEOUT:-30}"
+RSS_LIMIT_MB="${FUZZ_RSS_LIMIT_MB:-2048}"
 OUTPUT_DIR="${OUTPUT_DIR:-fuzzing_results_$(date +%Y%m%d_%H%M%S)}"
 WORKERS="${FUZZ_WORKERS:-$(nproc 2>/dev/null || echo 1)}"
 COLLECT_COVERAGE="${FUZZ_COLLECT_COVERAGE:-1}"
 
-mkdir -p "${OUTPUT_DIR}"
+mkdir -p "${OUTPUT_DIR}/targets"
 
 echo "=== Tatou Fuzzing Suite ==="
 echo "Time per fuzzer: ${FUZZ_TIME}s"
@@ -19,12 +21,13 @@ echo "Output: ${OUTPUT_DIR}"
 echo "Coverage: ${COLLECT_COVERAGE}"
 echo
 
-# Fuzzers to run
+# Fuzzing targets
 FUZZERS=(
-  api_fuzzer
-  inputs_fuzzer
-  watermarking_fuzzer
-  stateful_fuzzer
+  targets/fuzz_pdf_explore
+  targets/fuzz_pdf_apply
+  targets/fuzz_pdf_read
+  targets/fuzz_rest_endpoints
+  targets/fuzz_workflows
 )
 
 # Setup coverage
@@ -39,18 +42,23 @@ failures=0
 
 # Run each fuzzer
 for fuzzer in "${FUZZERS[@]}"; do
-  echo "Running ${fuzzer}..."
-  log="${OUTPUT_DIR}/${fuzzer}.log"
-  corpus_dir="fuzz/corpus/${fuzzer}"
-  seeds_dir="fuzz/seeds/${fuzzer}"
-  dict_file="fuzz/dictionaries/${fuzzer}.dict"
+  # Extract fuzzer name (handle targets/ prefix)
+  fuzzer_name="${fuzzer##*/}"
+  fuzzer_base="${fuzzer_name%.py}"
+
+  echo "Running ${fuzzer_name}..."
+  log="${OUTPUT_DIR}/${fuzzer_base}.log"
+  corpus_dir="fuzz/corpus/${fuzzer_base}"
+  seeds_dir="fuzz/seeds/${fuzzer_base}"
+  dict_file="fuzz/dictionaries/${fuzzer_base}.dict"
 
   # Create corpus dir if missing
   mkdir -p "${corpus_dir}"
 
   # Build fuzzer command with corpus (writable) and seeds (read-only)
+  # Add 120s overhead for instrumentation (atheris startup is slow)
   fuzz_cmd=(
-    timeout $((FUZZ_TIME + 60)) ${COV_CMD} "fuzz/${fuzzer}.py"
+    timeout $((FUZZ_TIME + 120)) ${COV_CMD} "fuzz/${fuzzer}.py"
     "${corpus_dir}"
   )
 
@@ -64,9 +72,11 @@ for fuzzer in "${FUZZERS[@]}"; do
   fuzz_cmd+=(
     -max_total_time="${FUZZ_TIME}"
     -max_len="${MAX_LEN}"
+    -timeout="${TIMEOUT}"
+    -rss_limit_mb="${RSS_LIMIT_MB}"
     -workers="${WORKERS}"
     -jobs="${WORKERS}"
-    -artifact_prefix="${OUTPUT_DIR}/${fuzzer}_"
+    -artifact_prefix="${OUTPUT_DIR}/${fuzzer_base}_"
     -print_final_stats=1
   )
 
@@ -83,10 +93,10 @@ for fuzzer in "${FUZZERS[@]}"; do
   set -e
 
   if [[ $status -ne 0 ]]; then
-    echo "✗ ${fuzzer} exited with status ${status}"
+    echo "✗ ${fuzzer_name} exited with status ${status}"
     failures=$((failures + 1))
   else
-    echo "✓ ${fuzzer} completed"
+    echo "✓ ${fuzzer_name} completed"
   fi
   echo
 done

@@ -21,12 +21,13 @@ White-box security testing to discover:
 
 ### Fuzzers
 
-| Fuzzer | Target | Focus | Dictionary Tokens |
-|--------|--------|-------|-------------------|
-| **api_fuzzer.py** | REST API endpoints | Auth, input validation, type confusion, header fuzzing | 198 |
-| **inputs_fuzzer.py** | Input validation | SQL injection (30+ variants), path traversal, file upload | 247 |
-| **watermarking_fuzzer.py** | PDF operations | Structure-aware PDF mutations, malicious payloads | 281 |
-| **stateful_fuzzer.py** | Multi-step workflows | IDOR, session management, state transitions | 95 |
+| Fuzzer | Target | Focus | Seeds |
+|--------|--------|-------|-------|
+| **targets/fuzz_rest_endpoints.py** | REST API endpoints | Auth, IDOR, input validation, SQL injection, XSS, path traversal | 100 |
+| **targets/fuzz_pdf_explore.py** | PDF parsing | explore_pdf() function, structure validation, malformed PDFs | 20 |
+| **targets/fuzz_pdf_apply.py** | PDF watermarking | apply_watermark(), structural mutations, edge cases | 20 |
+| **targets/fuzz_pdf_read.py** | Watermark extraction | read_watermark(), method-specific attacks, crypto validation | 20 |
+| **targets/fuzz_workflows.py** | Multi-step workflows | IDOR, session management, race conditions, state transitions | 85 |
 
 ### Key Components
 
@@ -35,29 +36,34 @@ fuzz/
 ├── README.md                      # This file
 ├── Dockerfile                     # Python 3.11 container
 ├── requirements.txt               # Dependencies
-├── api_fuzzer.py                  # API endpoint fuzzer
-├── inputs_fuzzer.py               # Input validation fuzzer
-├── watermarking_fuzzer.py         # PDF watermarking fuzzer
-├── stateful_fuzzer.py             # Multi-step workflow fuzzer
-├── utils/                         # Shared utilities (modular design)
-│   ├── __init__.py               # Package exports
-│   ├── app_setup.py              # Flask app and DB initialization
-│   ├── auth_helpers.py           # Auth token generation
-│   ├── pdf_generators.py         # PDF generation strategies
-│   └── security_checks.py        # Vulnerability detection
-├── dictionaries/                  # Structure-aware mutation dictionaries
-│   ├── api_fuzzer.dict           # 198 tokens
-│   ├── inputs_fuzzer.dict        # 247 tokens
-│   ├── watermarking_fuzzer.dict  # 281 tokens
-│   └── stateful_fuzzer.dict      # 95 tokens
+├── targets/                       # Fuzzing targets
+│   ├── fuzz_rest_endpoints.py    # REST API endpoint fuzzer
+│   ├── fuzz_pdf_explore.py       # PDF exploration fuzzer
+│   ├── fuzz_pdf_apply.py         # PDF watermarking fuzzer
+│   ├── fuzz_pdf_read.py          # Watermark reading fuzzer
+│   └── fuzz_workflows.py         # Multi-step workflow fuzzer
+├── harness/                       # Test harness infrastructure
+│   ├── app.py                    # Flask app and SQLite DB initialization
+│   ├── env.py                    # Environment configuration
+│   └── reset.py                  # Cleanup utilities
+├── builders/                      # Request builders
+│   ├── auth.py                   # Authentication helpers
+│   └── rest_builders.py          # REST endpoint builders
+├── models/                        # Data models
+│   ├── pdf.py                    # PDF input models
+│   └── rest.py                   # REST request models
+├── oracles/                       # Bug detection oracles
+│   ├── invariants.py             # Endpoint invariants and IDOR checks
+│   └── security.py               # Security vulnerability detection
 ├── seeds/                         # Curated seed inputs (version controlled)
-│   ├── api_fuzzer/               # Seeds for API fuzzing
-│   ├── inputs_fuzzer/            # Seeds for input validation
-│   ├── watermarking_fuzzer/      # Seeds for PDF fuzzing
-│   └── stateful_fuzzer/          # Seeds for stateful fuzzing
-├── corpus/                        # Runtime discoveries (gitignored, auto-generated hashes)
+│   ├── fuzz_rest_endpoints/      # REST API seeds
+│   ├── fuzz_pdf_explore/         # PDF parsing seeds
+│   ├── fuzz_pdf_apply/           # Watermarking seeds
+│   ├── fuzz_pdf_read/            # Watermark reading seeds
+│   └── fuzz_workflows/           # Multi-step workflow seeds
+├── corpus/                        # Runtime discoveries (gitignored)
 └── scripts/
-    └── run_fuzzing_suite.sh       # Orchestrates all 4 fuzzers
+    └── run_fuzzing_suite.sh       # Orchestrates all 5 fuzzers
 ```
 
 ## How It Works
@@ -173,34 +179,40 @@ FUZZ_TIME=600 MAX_LEN=10000 docker compose up fuzzer
 ### Run Individual Fuzzers
 
 ```bash
-# API fuzzer only
-docker compose run --rm fuzzer python fuzz/api_fuzzer.py \
-    fuzz/corpus/api_fuzzer/ \
-    fuzz/seeds/api_fuzzer/ \
+# REST API fuzzer
+docker compose run --rm fuzzer python fuzz/targets/fuzz_rest_endpoints.py \
+    fuzz/corpus/fuzz_rest_endpoints/ \
+    fuzz/seeds/fuzz_rest_endpoints/ \
     -max_total_time=300 \
-    -max_len=5000 \
-    -dict=fuzz/dictionaries/api_fuzzer.dict
+    -max_len=5000
 
-# Watermarking fuzzer
-docker compose run --rm fuzzer python fuzz/watermarking_fuzzer.py \
-    fuzz/corpus/watermarking_fuzzer/ \
-    fuzz/seeds/watermarking_fuzzer/ \
+# PDF exploration fuzzer
+docker compose run --rm fuzzer python fuzz/targets/fuzz_pdf_explore.py \
+    fuzz/corpus/fuzz_pdf_explore/ \
+    fuzz/seeds/fuzz_pdf_explore/ \
     -max_total_time=300 \
-    -dict=fuzz/dictionaries/watermarking_fuzzer.dict
+    -max_len=5000
 
-# Input validation fuzzer
-docker compose run --rm fuzzer python fuzz/inputs_fuzzer.py \
-    fuzz/corpus/inputs_fuzzer/ \
-    fuzz/seeds/inputs_fuzzer/ \
+# PDF watermarking fuzzer
+docker compose run --rm fuzzer python fuzz/targets/fuzz_pdf_apply.py \
+    fuzz/corpus/fuzz_pdf_apply/ \
+    fuzz/seeds/fuzz_pdf_apply/ \
     -max_total_time=300 \
-    -dict=fuzz/dictionaries/inputs_fuzzer.dict
+    -max_len=5000
 
-# Stateful fuzzer
-docker compose run --rm fuzzer python fuzz/stateful_fuzzer.py \
-          fuzz/corpus/stateful_fuzzer \
-          fuzz/seeds/stateful_fuzzer \
-          -max_total_time=300 \
-          -dict=fuzz/dictionaries/stateful_fuzzer.dict
+# Watermark reading fuzzer
+docker compose run --rm fuzzer python fuzz/targets/fuzz_pdf_read.py \
+    fuzz/corpus/fuzz_pdf_read/ \
+    fuzz/seeds/fuzz_pdf_read/ \
+    -max_total_time=300 \
+    -max_len=5000
+
+# Multi-step workflow fuzzer
+docker compose run --rm fuzzer python fuzz/targets/fuzz_workflows.py \
+    fuzz/corpus/fuzz_workflows/ \
+    fuzz/seeds/fuzz_workflows/ \
+    -max_total_time=300 \
+    -max_len=1000
 
 ```
 
@@ -209,14 +221,13 @@ docker compose run --rm fuzzer python fuzz/stateful_fuzzer.py \
 LibFuzzer flags (see [LibFuzzer docs](https://llvm.org/docs/LibFuzzer.html)):
 
 ```bash
-docker compose run --rm fuzzer python fuzz/api_fuzzer.py \
-    fuzz/corpus/api_fuzzer/ \
-    fuzz/seeds/api_fuzzer/ \
+docker compose run --rm fuzzer python fuzz/targets/fuzz_rest_endpoints.py \
+    fuzz/corpus/fuzz_rest_endpoints/ \
+    fuzz/seeds/fuzz_rest_endpoints/ \
     -max_total_time=600 \          # Fuzz for 10 minutes
     -max_len=10000 \                # Allow 10KB inputs
     -workers=4 \                    # Use 4 parallel workers
     -jobs=4 \                       # Run 4 jobs
-    -dict=fuzz/dictionaries/api_fuzzer.dict \
     -print_final_stats=1            # Show statistics at end
 ```
 
@@ -225,9 +236,9 @@ docker compose run --rm fuzzer python fuzz/api_fuzzer.py \
 For **faster fuzzing** and **better resource usage**:
 
 ```bash
-docker compose run --rm fuzzer python fuzz/api_fuzzer.py \
-    fuzz/corpus/api_fuzzer/ \
-    fuzz/seeds/api_fuzzer/ \
+docker compose run --rm fuzzer python fuzz/targets/fuzz_rest_endpoints.py \
+    fuzz/corpus/fuzz_rest_endpoints/ \
+    fuzz/seeds/fuzz_rest_endpoints/ \
     -max_total_time=3600 \
     -timeout=30 \                   # Kill inputs that hang >30s
     -rss_limit_mb=2048 \            # Limit memory to 2GB (prevent OOM)
@@ -241,10 +252,10 @@ docker compose run --rm fuzzer python fuzz/api_fuzzer.py \
 
 ```bash
 # Merge and minimize corpus from multiple runs
-docker compose run --rm fuzzer python fuzz/api_fuzzer.py \
+docker compose run --rm fuzzer python fuzz/targets/fuzz_rest_endpoints.py \
     -merge=1 \
-    fuzz/corpus/api_fuzzer_merged/ \
-    fuzz/corpus/api_fuzzer/ \
+    fuzz/corpus/fuzz_rest_endpoints_merged/ \
+    fuzz/corpus/fuzz_rest_endpoints/ \
     fuzzing_results_*/corpus/
 
 # This removes duplicate/redundant inputs, keeping only unique coverage
@@ -256,12 +267,12 @@ docker compose run --rm fuzzer python fuzz/api_fuzzer.py \
 
 ```
 === Tatou Fuzzing Suite ===
-Running api_fuzzer...
+Running fuzz_rest_endpoints...
 #2      INITED exec/s: 0 rss: 54Mb
 #4096   pulse  corp: 12/234b lim: 43 exec/s: 2048
 #8192   pulse  corp: 28/1.2kb lim: 80 exec/s: 2730
 #16384  pulse  corp: 45/3.4kb lim: 163 exec/s: 2340
-✓ api_fuzzer completed
+✓ fuzz_rest_endpoints completed
 ```
 
 **Good signs:**
@@ -276,7 +287,7 @@ AssertionError: SQL error leaked in /api/create-user: found 'syntax error'
 ```
 
 **This is what you want to find!** The fuzzer discovered a vulnerability:
-- Input saved to `fuzzing_results_*/api_fuzzer_crash-*`
+- Input saved to `fuzzing_results_*/fuzz_rest_endpoints_crash-*`
 - Reproduce by running that input through the fuzzer
 - Fix the bug in the application code
 - Re-run fuzzer to verify fix
@@ -306,17 +317,25 @@ Review coverage to find untested code paths.
 
 ### Adding New Fuzzers
 
-1. **Create fuzzer file:** `fuzz/newfeature_fuzzer.py`
+1. **Create fuzzer file:** `fuzz/targets/fuzz_newfeature.py`
 
 ```python
 #!/usr/bin/env python3
 """New feature fuzzer - Description of what it tests."""
+from __future__ import annotations
+
 import sys
+from pathlib import Path
+
+# Add fuzz directory to path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 import atheris
 
 with atheris.instrument_imports():
-    from utils import get_app, make_auth_header, check_security_vulnerabilities
-    # Import all code under test
+    from harness import get_app, cleanup_storage
+    from builders import build_auth_header
+    from oracles import check_endpoint_invariants, check_security_vulnerabilities
 
 def fuzz_one_input(data: bytes) -> None:
     """Fuzz new feature.
@@ -336,18 +355,15 @@ def fuzz_one_input(data: bytes) -> None:
     }
 
     try:
-        # Call code under test
         with app.test_client() as client:
             resp = client.post(
                 "/api/endpoint",
                 json=payload,
-                headers={"Authorization": make_auth_header()}
+                headers={"Authorization": build_auth_header()}
             )
 
-        # Add security checks
-        if resp.status_code not in {200, 400, 401}:
-            raise AssertionError(f"Unexpected status: {resp.status_code}")
-
+        # Check invariants and security
+        check_endpoint_invariants(resp, "/api/endpoint")
         check_security_vulnerabilities(resp, "/api/endpoint")
 
     except (SystemExit, KeyboardInterrupt):
@@ -356,6 +372,8 @@ def fuzz_one_input(data: bytes) -> None:
         raise  # Let fuzzer save the crashing input
     except Exception:
         pass  # Expected for malformed inputs
+    finally:
+        cleanup_storage()
 
 def main() -> None:
     """Entry point for fuzzer."""
@@ -366,19 +384,18 @@ if __name__ == "__main__":
     main()
 ```
 
-2. **Create seed corpus:** `fuzz/seeds/newfeature_fuzzer/`
+2. **Create seed corpus:** `fuzz/seeds/fuzz_newfeature/`
    - Add descriptive seed files: `valid_request.bin`, `edge_case_empty.bin`, etc.
 
-3. **Create dictionary (optional):** `fuzz/dictionaries/newfeature_fuzzer.dict`
-
-4. **Add to suite:** Edit `fuzz/scripts/run_fuzzing_suite.sh`:
+3. **Add to suite:** Edit `fuzz/scripts/run_fuzzing_suite.sh`:
 ```bash
 FUZZERS=(
-  api_fuzzer
-  inputs_fuzzer
-  watermarking_fuzzer
-  stateful_fuzzer
-  newfeature_fuzzer  # Add here
+  targets/fuzz_pdf_explore
+  targets/fuzz_pdf_apply
+  targets/fuzz_pdf_read
+  targets/fuzz_rest_endpoints
+  targets/fuzz_workflows
+  targets/fuzz_newfeature  # Add here
 )
 ```
 
@@ -388,13 +405,13 @@ Add realistic inputs that exercise different code paths in `seeds/` directory:
 
 ```bash
 # Valid inputs
-echo '{"email": "user@test.com", "password": "pass123"}' > seeds/api_fuzzer/valid_login.bin  # pragma: allowlist secret
+echo '{"email": "user@test.com", "password": "pass123"}' > seeds/fuzz_rest_endpoints/valid_login.bin  # pragma: allowlist secret
 
 # Boundary conditions
-echo '{"email": "", "password": "x"}' > seeds/api_fuzzer/empty_email.bin
+echo '{"email": "", "password": "x"}' > seeds/fuzz_rest_endpoints/empty_email.bin
 
 # Attack patterns
-echo '{"email": "admin@test.com", "password": "' OR 1=1--"}' > seeds/api_fuzzer/sql_injection_password.bin
+echo '{"email": "admin@test.com", "password": "' OR 1=1--"}' > seeds/fuzz_rest_endpoints/sql_injection_password.bin
 ```
 
 **Best practices for seeds:**
@@ -582,14 +599,14 @@ with atheris.instrument_imports():
 1. **Reproduce:** Run the crash-* artifact through the fuzzer
 ```bash
 # Replay the exact crashing input
-docker compose run --rm fuzzer python fuzz/api_fuzzer.py \
-    fuzzing_results_*/api_fuzzer_crash-abc123
+docker compose run --rm fuzzer python fuzz/targets/fuzz_rest_endpoints.py \
+    fuzzing_results_*/fuzz_rest_endpoints_crash-abc123
 ```
 
 2. **Minimize:** Shrink the input to its minimal form
 ```bash
-docker compose run --rm fuzzer python fuzz/api_fuzzer.py \
-    fuzzing_results_*/api_fuzzer_crash-abc123 \
+docker compose run --rm fuzzer python fuzz/targets/fuzz_rest_endpoints.py \
+    fuzzing_results_*/fuzz_rest_endpoints_crash-abc123 \
     -minimize_crash=1 \
     -exact_artifact_path=minimal_crash
 ```
@@ -597,11 +614,11 @@ docker compose run --rm fuzzer python fuzz/api_fuzzer.py \
 3. **Debug:** Examine the input and stack trace
 ```bash
 # View the crashing input
-xxd fuzzing_results_*/api_fuzzer_crash-abc123
+xxd fuzzing_results_*/fuzz_rest_endpoints_crash-abc123
 
 # Run with Python debugger
-docker compose run --rm fuzzer python -m pdb fuzz/api_fuzzer.py \
-    fuzzing_results_*/api_fuzzer_crash-abc123
+docker compose run --rm fuzzer python -m pdb fuzz/targets/fuzz_rest_endpoints.py \
+    fuzzing_results_*/fuzz_rest_endpoints_crash-abc123
 ```
 
 4. **Fix:** Patch the vulnerability in application code
@@ -609,8 +626,8 @@ docker compose run --rm fuzzer python -m pdb fuzz/api_fuzzer.py \
 5. **Verify:** Re-run fuzzer to confirm it's fixed
 ```bash
 # Should not crash anymore
-docker compose run --rm fuzzer python fuzz/api_fuzzer.py \
-    fuzzing_results_*/api_fuzzer_crash-abc123
+docker compose run --rm fuzzer python fuzz/targets/fuzz_rest_endpoints.py \
+    fuzzing_results_*/fuzz_rest_endpoints_crash-abc123
 
 # Run full fuzzer to ensure no regressions
 FUZZ_TIME=600 docker compose up fuzzer
@@ -634,10 +651,11 @@ Expected performance on modern hardware (4-core CPU, 8GB RAM):
 
 | Fuzzer | exec/s | corpus/hour | Resource |
 |--------|--------|-------------|----------|
-| api_fuzzer | 2000-3000 | +50 inputs | Light (CPU-bound) |
-| inputs_fuzzer | 1500-2500 | +40 inputs | Medium (I/O for files) |
-| watermarking_fuzzer | 500-1000 | +20 inputs | Heavy (PDF parsing) |
-| stateful_fuzzer | 800-1500 | +30 inputs | Medium (multi-step flows) |
+| fuzz_rest_endpoints | 100-200 | +40 inputs | Medium (DB + validation) |
+| fuzz_pdf_explore | 150-300 | +20 inputs | Heavy (PDF parsing) |
+| fuzz_pdf_apply | 40-80 | +15 inputs | Very Heavy (watermarking) |
+| fuzz_pdf_read | 100-200 | +20 inputs | Heavy (extraction) |
+| fuzz_workflows | 20-40 | +30 inputs | Very Heavy (multi-step) |
 
 **Factors affecting performance:**
 - ✅ **Fast:** Simple input validation, pure computation

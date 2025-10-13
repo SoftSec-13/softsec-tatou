@@ -31,6 +31,8 @@ from observability import (
     render_prometheus,
 )
 
+MAX_DB_INT = (2**63) - 1
+
 RMAPHandler = None  # default
 if not os.environ.get("TATOU_TEST_DISABLE_RMAP"):
     try:  # Allow tests to disable RMAP dependency via env var
@@ -420,10 +422,13 @@ def create_app():
             document_id = request.args.get("id") or request.args.get("documentid")
             try:
                 document_id = int(document_id) if document_id else None
-                if document_id is None or document_id <= 0:
+                if document_id is None or document_id <= 0 or document_id > MAX_DB_INT:
                     return jsonify({"error": "document id required"}), 400
             except (TypeError, ValueError):
                 return jsonify({"error": "document id required"}), 400
+
+        if document_id is None or document_id <= 0 or document_id > MAX_DB_INT:
+            return jsonify({"error": "document id required"}), 400
 
         try:
             with get_engine().connect() as conn:
@@ -526,6 +531,9 @@ def create_app():
                 document_id = int(document_id)
             except (TypeError, ValueError):
                 return jsonify({"error": "document id required"}), 400
+
+        if document_id is None or document_id <= 0 or document_id > MAX_DB_INT:
+            return jsonify({"error": "document id required"}), 400
 
         try:
             with get_engine().connect() as conn:
@@ -740,7 +748,7 @@ def create_app():
         except (TypeError, ValueError):
             return jsonify({"error": "document id required"}), 400
 
-        if doc_id <= 0:
+        if doc_id <= 0 or doc_id > MAX_DB_INT:
             return jsonify({"error": "document id required"}), 400
 
         owner_id = int(g.user["id"])
@@ -848,6 +856,8 @@ def create_app():
             if doc_id is None:
                 return jsonify({"error": "document_id (int) is required"}), 400
             doc_id = int(doc_id)
+            if doc_id <= 0 or doc_id > MAX_DB_INT:
+                return jsonify({"error": "document_id (int) is required"}), 400
         except (TypeError, ValueError):
             return jsonify({"error": "document_id (int) is required"}), 400
         if (
@@ -1049,6 +1059,8 @@ def create_app():
             if doc_id is None:
                 return jsonify({"error": "document_id (int) is required"}), 400
             doc_id = int(doc_id)
+            if doc_id <= 0 or doc_id > MAX_DB_INT:
+                return jsonify({"error": "document_id (int) is required"}), 400
         except (TypeError, ValueError):
             return jsonify({"error": "document_id (int) is required"}), 400
         if not method or not isinstance(method, str) or not isinstance(key, str):

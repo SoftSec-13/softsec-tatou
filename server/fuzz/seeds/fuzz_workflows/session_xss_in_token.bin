@@ -1,0 +1,1 @@
+[{"action": "set_token", "token": "<script>alert(1)</script>"}, {"action": "list_documents"}]

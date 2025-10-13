@@ -1,0 +1,1 @@
+[{"action": "login", "email": "user@test.com", "password": "password123"}, {"action": "create_watermark", "documentid": 1, "method": "basic"}, {"action": "list_versions", "documentid": 1}, {"action": "list_all_versions"}, {"action": "get_version", "link": "test-link"}]

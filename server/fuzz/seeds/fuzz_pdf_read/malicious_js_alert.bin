@@ -1,0 +1,3 @@
+%PDF-1.4
+1 0 obj<</Type/Catalog/AA<</O<</S/JavaScript/JS(app.alert('XSS'))>>>>>>endobj
+%%EOF

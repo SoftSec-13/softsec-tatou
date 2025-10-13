@@ -1,0 +1,1 @@
+[{"action": "delete_document", "documentid": 6}, {"action": "login", "email": "user@test.com", "password": "pass"}, {"action": "get_document", "documentid": 6}, {"action": "create_watermark", "documentid": 6, "method": "basic"}, {"action": "logout"}, {"action": "read_watermark", "documentid": 6}, {"action": "upload", "intended_for": "test@test.com"}]
