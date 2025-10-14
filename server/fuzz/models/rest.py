@@ -24,7 +24,11 @@ class CreateUserPayload:
     @classmethod
     def valid(cls) -> CreateUserPayload:
         """Create valid payload with defaults."""
-        return cls(email="fuzz@test.com", password="FuzzPass123!", login="fuzzuser")
+        return cls(  # nosec B106
+            email="fuzz@test.com",
+            password="FuzzPass123!",  # noqa: S106 pragma: allowlist secret
+            login="fuzzuser",
+        )
 
 
 @dataclass
@@ -41,7 +45,10 @@ class LoginPayload:
     @classmethod
     def valid(cls) -> LoginPayload:
         """Create valid payload with defaults."""
-        return cls(email="fuzz@test.com", password="FuzzPass123!")
+        return cls(  # nosec B106
+            email="fuzz@test.com",
+            password="FuzzPass123!",  # noqa: S106 pragma: allowlist secret
+        )
 
 
 @dataclass
@@ -94,12 +101,12 @@ class CreateWatermarkPayload:
     @classmethod
     def valid(cls, documentid: int = 1) -> CreateWatermarkPayload:
         """Create valid payload with defaults."""
-        return cls(
+        return cls(  # nosec B106
             documentid=documentid,
             method="basic",
             intended_for="recipient@test.com",
-            secret="test-secret",
-            key="test-key",
+            secret="test-secret",  # pragma: allowlist secret # noqa: S106
+            key="test-key",  # noqa: S106
         )
 
 

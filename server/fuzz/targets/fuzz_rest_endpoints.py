@@ -205,11 +205,11 @@ def fuzz_one_input(data: bytes) -> None:
                     # Invalid tokens
                     mutation_type = fdp.ConsumeIntInRange(0, 3)
                     if mutation_type == 0:
-                        metrics_token = ""
+                        metrics_token = ""  # nosec B105
                     elif mutation_type == 1:
-                        metrics_token = "' OR 1=1--"
+                        metrics_token = "' OR 1=1--"  # nosec B105
                     elif mutation_type == 2:
-                        metrics_token = "../../../etc/passwd"
+                        metrics_token = "../../../etc/passwd"  # nosec B105
                     else:
                         metrics_token = None  # type: ignore[assignment]
 

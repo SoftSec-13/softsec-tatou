@@ -1,1 +1,0 @@
-{"email": "' AND EXTRACTVALUE(1,CONCAT(0x7e,(SELECT @@version)))--", "password": ""}

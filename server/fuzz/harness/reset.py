@@ -73,5 +73,5 @@ def _cleanup_temp_on_exit() -> None:
         temp_root = get_temp_root()
         shutil.rmtree(temp_root, ignore_errors=True)
         logger.debug(f"Cleaned up temp directory: {temp_root}")
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug(f"Failed to cleanup temp directory: {exc}")

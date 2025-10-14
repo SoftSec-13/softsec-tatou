@@ -1,1 +1,0 @@
-{"email": "admin", "password": "' OR JSON_EXTRACT(password,'$')='admin'--"}

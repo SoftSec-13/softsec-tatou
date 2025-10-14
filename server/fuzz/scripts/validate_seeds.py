@@ -14,8 +14,8 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SEEDS_ROOT = REPO_ROOT / "seeds"
-INPUTS_ALLOWED_EMPTY: set[str] = set()
-WATERMARK_ALLOWED_EMPTY: set[str] = {"edge_empty_file.bin"}
+REST_ALLOWED_EMPTY: set[str] = set()
+PDF_ALLOWED_EMPTY: set[str] = {"edge_empty_file.bin"}
 
 
 class SeedValidationError(RuntimeError):
@@ -29,7 +29,8 @@ def _iter_seed_files(subdir: str) -> Iterable[Path]:
     yield from sorted(seed_dir.glob("*.bin"))
 
 
-def _validate_api_seed(path: Path) -> None:
+def _validate_rest_seed(path: Path) -> None:
+    """Validate REST API endpoint seeds (JSON payloads)."""
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except Exception as exc:  # noqa: BLE001
@@ -40,7 +41,8 @@ def _validate_api_seed(path: Path) -> None:
         )
 
 
-def _validate_stateful_seed(path: Path) -> None:
+def _validate_workflow_seed(path: Path) -> None:
+    """Validate workflow seeds (JSON arrays of actions)."""
     try:
         workflow = json.loads(path.read_text(encoding="utf-8"))
     except Exception as exc:  # noqa: BLE001
@@ -52,7 +54,8 @@ def _validate_stateful_seed(path: Path) -> None:
     for index, step in enumerate(workflow):
         if not isinstance(step, dict):
             raise SeedValidationError(
-                f"{path}: workflow step {index} is {type(step).__name__}, expected object"
+                f"{path}: workflow step {index} is {type(step).__name__}, "
+                "expected object"
             )
         action = step.get("action")
         if not isinstance(action, str) or not action:
@@ -61,23 +64,19 @@ def _validate_stateful_seed(path: Path) -> None:
             )
 
 
-def _validate_inputs_seed(path: Path) -> None:
+def _validate_pdf_seed(path: Path) -> None:
+    """Validate PDF seeds (binary PDF data)."""
     data = path.read_bytes()
-    if not data and path.name not in INPUTS_ALLOWED_EMPTY:
-        raise SeedValidationError(f"{path}: seed is empty")
-
-
-def _validate_watermark_seed(path: Path) -> None:
-    data = path.read_bytes()
-    if not data and path.name not in WATERMARK_ALLOWED_EMPTY:
+    if not data and path.name not in PDF_ALLOWED_EMPTY:
         raise SeedValidationError(f"{path}: seed is empty")
 
 
 VALIDATORS = {
-    "api_fuzzer": _validate_api_seed,
-    "inputs_fuzzer": _validate_inputs_seed,
-    "stateful_fuzzer": _validate_stateful_seed,
-    "watermarking_fuzzer": _validate_watermark_seed,
+    "fuzz_rest_endpoints": _validate_rest_seed,
+    "fuzz_workflows": _validate_workflow_seed,
+    "fuzz_pdf_explore": _validate_pdf_seed,
+    "fuzz_pdf_read": _validate_pdf_seed,
+    "fuzz_pdf_apply": _validate_pdf_seed,
 }
 
 

@@ -1,1 +1,0 @@
-; export MALICIOUS=evil; echo $MALICIOUS

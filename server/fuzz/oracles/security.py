@@ -31,7 +31,12 @@ XSS_PATTERNS = ["<script>", "javascript:", "onerror=", "onload=", "onclick="]
 
 CMD_PATTERNS = ["/bin/sh", "/bin/bash", "sh -c", "cmd.exe", "; ls", "| cat"]
 
-SSRF_PATTERNS = ["localhost", "127.0.0.1", "169.254.169.254", "0.0.0.0"]
+SSRF_PATTERNS = [
+    "localhost",
+    "127.0.0.1",
+    "169.254.169.254",
+    "0.0.0.0",  # nosec B104
+]
 
 PATH_PATTERNS = [
     "/etc/passwd",

@@ -76,7 +76,7 @@ def fuzz_one_input(data: bytes) -> None:
         )
 
         # Validate result
-        if not isinstance(result, (bytes, bytearray)):
+        if not isinstance(result, bytes | bytearray):
             raise AssertionError(
                 f"apply_watermark must return bytes, got {type(result)}"
             )

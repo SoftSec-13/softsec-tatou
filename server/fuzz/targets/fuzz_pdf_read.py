@@ -27,7 +27,7 @@ with atheris.instrument_imports():
 logger = logging.getLogger(__name__)
 
 PDF_MAX_BYTES = 50_000
-KNOWN_SECRET = "known-secret"
+KNOWN_SECRET = "known-secret"  # nosec B105  # pragma: allowlist secret
 KNOWN_KEY = "known-key"
 
 
@@ -73,7 +73,7 @@ def fuzz_one_input(data: bytes) -> None:
             intended_for="fuzzer@test.com",
         )
 
-        if not isinstance(watermarked_bytes, (bytes, bytearray)):
+        if not isinstance(watermarked_bytes, bytes | bytearray):
             return  # Skip if apply failed
 
         # Write watermarked PDF

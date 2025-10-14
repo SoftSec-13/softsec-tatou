@@ -49,7 +49,7 @@ def get_temp_root() -> Path:
     """Get temp root directory."""
     if _TEMP_ROOT is None:
         configure_environment()
-    assert _TEMP_ROOT is not None
+    assert _TEMP_ROOT is not None  # nosec B101
     return _TEMP_ROOT
 
 
@@ -57,5 +57,5 @@ def get_storage_dir() -> Path:
     """Get storage directory."""
     if _STORAGE_DIR is None:
         configure_environment()
-    assert _STORAGE_DIR is not None
+    assert _STORAGE_DIR is not None  # nosec B101
     return _STORAGE_DIR
