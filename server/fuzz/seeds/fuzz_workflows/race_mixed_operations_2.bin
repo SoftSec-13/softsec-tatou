@@ -1,1 +1,0 @@
-[{"action": "login", "email": "user@test.com", "password": "pass"}, {"action": "concurrent_mixed", "operations": [{"action": "upload", "intended_for": "test@test.com"}, {"action": "list_documents"}, {"action": "delete_document", "documentid": 2}, {"action": "create_watermark", "documentid": 3, "method": "basic"}]}]

@@ -11,6 +11,7 @@ import io
 import json
 import logging
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -22,7 +23,11 @@ import atheris
 with atheris.instrument_imports():
     from harness import cleanup_storage, get_app
     from models import PDFInput
-    from oracles import check_ownership_invariant
+    from oracles import (
+        check_endpoint_invariants,
+        check_ownership_invariant,
+        check_security_vulnerabilities,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -71,17 +76,23 @@ def execute_workflow(client, workflow: list[dict[str, Any]], seed: bytes) -> Non
             email = step.get("email") or f"user{idx}@test.com"
             password = step.get("password") or "pass"
             login = email.split("@")[0]
-            client.post(
+            start_time = time.time()
+            resp = client.post(
                 "/api/create-user",
                 json={"email": email, "password": password, "login": login},
             )
+            check_endpoint_invariants(resp, "/api/create-user")
+            check_security_vulnerabilities(resp, "/api/create-user", start_time)
 
         elif action == "login":
             email = step.get("email") or "user@test.com"
             password = step.get("password") or "pass"
+            start_time = time.time()
             resp = client.post(
                 "/api/login", json={"email": email, "password": password}
             )
+            check_endpoint_invariants(resp, "/api/login")
+            check_security_vulnerabilities(resp, "/api/login", start_time)
             if resp.status_code == 200:
                 data = resp.get_json(silent=True) or {}
                 raw_token = data.get("token")
@@ -101,6 +112,7 @@ def execute_workflow(client, workflow: list[dict[str, Any]], seed: bytes) -> Non
             filename = (step.get("filename") or "workflow.pdf").strip()
             pdf_input = PDFInput.from_bytes(pdf_bytes, filename)
 
+            start_time = time.time()
             resp = client.post(
                 "/api/upload-document",
                 headers={"Authorization": token},
@@ -115,6 +127,8 @@ def execute_workflow(client, workflow: list[dict[str, Any]], seed: bytes) -> Non
                 },
                 content_type="multipart/form-data",
             )
+            check_endpoint_invariants(resp, "/api/upload-document")
+            check_security_vulnerabilities(resp, "/api/upload-document", start_time)
 
             if resp.status_code in {200, 201}:
                 data = resp.get_json(silent=True) or {}
@@ -123,30 +137,40 @@ def execute_workflow(client, workflow: list[dict[str, Any]], seed: bytes) -> Non
                     owned_docs.add(doc_id)
 
         elif action == "list_documents" and token:
-            client.get("/api/list-documents", headers={"Authorization": token})
+            start_time = time.time()
+            resp = client.get("/api/list-documents", headers={"Authorization": token})
+            check_endpoint_invariants(resp, "/api/list-documents")
+            check_security_vulnerabilities(resp, "/api/list-documents", start_time)
 
         elif action == "get_document" and token:
             doc_id = int(step.get("documentid", 1))
+            start_time = time.time()
             resp = client.get(
                 "/api/get-document",
                 headers={"Authorization": token},
                 query_string={"id": doc_id},
             )
+            check_endpoint_invariants(resp, "/api/get-document")
+            check_security_vulnerabilities(resp, "/api/get-document", start_time)
             check_ownership_invariant(resp, "/api/get-document", owned_docs, doc_id)
 
         elif action == "delete_document" and token:
             doc_id = int(step.get("documentid", 1))
+            start_time = time.time()
             resp = client.delete(
                 "/api/delete-document",
                 headers={"Authorization": token},
                 json={"documentid": doc_id},
             )
+            check_endpoint_invariants(resp, "/api/delete-document")
+            check_security_vulnerabilities(resp, "/api/delete-document", start_time)
             check_ownership_invariant(resp, "/api/delete-document", owned_docs, doc_id)
             if resp.status_code in {200, 204}:
                 owned_docs.discard(doc_id)
 
         elif action == "create_watermark" and token and owned_docs:
             doc_id = int(step.get("documentid", next(iter(owned_docs))))
+            start_time = time.time()
             resp = client.post(
                 "/api/create-watermark",
                 headers={"Authorization": token},
@@ -158,6 +182,8 @@ def execute_workflow(client, workflow: list[dict[str, Any]], seed: bytes) -> Non
                     "key": step.get("key", "workflow-key"),
                 },
             )
+            check_endpoint_invariants(resp, "/api/create-watermark")
+            check_security_vulnerabilities(resp, "/api/create-watermark", start_time)
             if resp.status_code == 201:
                 data = resp.get_json(silent=True) or {}
                 version_id = data.get("documentid")
@@ -166,7 +192,8 @@ def execute_workflow(client, workflow: list[dict[str, Any]], seed: bytes) -> Non
 
         elif action == "read_watermark" and token and owned_docs:
             doc_id = int(step.get("documentid", next(iter(owned_docs))))
-            client.post(
+            start_time = time.time()
+            resp = client.post(
                 "/api/read-watermark",
                 headers={"Authorization": token},
                 json={
@@ -175,6 +202,8 @@ def execute_workflow(client, workflow: list[dict[str, Any]], seed: bytes) -> Non
                     "key": step.get("key", "workflow-key"),
                 },
             )
+            check_endpoint_invariants(resp, "/api/read-watermark")
+            check_security_vulnerabilities(resp, "/api/read-watermark", start_time)
 
 
 def fuzz_one_input(data: bytes) -> None:

@@ -1,0 +1,1 @@
+; echo 'evil' > /tmp/evil.txt

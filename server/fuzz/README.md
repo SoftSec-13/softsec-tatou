@@ -6,7 +6,7 @@
 
 White-box security testing to discover:
 - 🔒 **Security vulnerabilities** - SQL injection, XSS, SSRF, path traversal, IDOR, auth bypass, JWT flaws
-- 💥 **Crashes and exceptions** - Memory corruption, unhandled errors, race conditions
+- 💥 **Crashes and exceptions** - Memory corruption, unhandled errors, unexpected state transitions
 - 🐛 **Edge cases** - Malformed inputs, boundary conditions, type confusion
 
 **Key Features:**
@@ -14,7 +14,6 @@ White-box security testing to discover:
 - ✅ Structure-aware mutations via dictionaries (198-281 tokens per fuzzer)
 - ✅ Advanced attack pattern detection (JWT, XXE, NoSQL, SSTI, prototype pollution)
 - ✅ Stateful fuzzing for multi-step workflows and IDOR
-- ✅ Race condition detection via concurrent requests
 - ✅ Enhanced PDF generation (6 strategies: valid, malicious, nested, memory exhaustion)
 
 ## Architecture
@@ -27,7 +26,7 @@ White-box security testing to discover:
 | **targets/fuzz_pdf_explore.py** | PDF parsing | explore_pdf() function, structure validation, malformed PDFs | 20 |
 | **targets/fuzz_pdf_apply.py** | PDF watermarking | apply_watermark(), structural mutations, edge cases | 20 |
 | **targets/fuzz_pdf_read.py** | Watermark extraction | read_watermark(), method-specific attacks, crypto validation | 20 |
-| **targets/fuzz_workflows.py** | Multi-step workflows | IDOR, session management, race conditions, state transitions | 85 |
+| **targets/fuzz_workflows.py** | Multi-step workflows | IDOR, session management, state transitions | 60 |
 
 ### Key Components
 

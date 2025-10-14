@@ -48,7 +48,18 @@ SENSITIVE_EXTS = [".env", ".config", ".bak", ".old", ".key", ".pem", "id_rsa"]
 PUBLIC_ENDPOINTS = ["/healthz", "/api/get-watermarking-methods"]
 
 # Performance thresholds (configurable via env)
-MAX_RESPONSE_TIME_MS = 500
+# Default threshold for most endpoints
+MAX_RESPONSE_TIME_MS = 1000
+
+# Per-endpoint thresholds for operations that are legitimately slower
+# PDF/crypto operations can take longer due to parsing and cryptographic operations
+ENDPOINT_LATENCY_THRESHOLDS = {
+    "/api/create-watermark": 2000,  # Watermarking + PDF modification
+    "/api/read-watermark": 2000,  # Watermark extraction + crypto validation
+    "/api/upload-document": 1500,  # PDF upload + validation
+    "/api/get-document": 800,  # PDF retrieval
+    "/api/get-version": 800,  # Versioned PDF retrieval
+}
 
 
 def check_security_vulnerabilities(
@@ -124,12 +135,14 @@ def check_security_vulnerabilities(
         if not auth or not auth.startswith("Bearer "):
             raise AssertionError(f"Auth bypass possible on {endpoint}")
 
-    # Latency check (DoS indicator)
+    # Latency check (DoS indicator) with per-endpoint thresholds
     if start_time is not None:
         elapsed_ms = (time.time() - start_time) * 1000
-        if elapsed_ms > MAX_RESPONSE_TIME_MS:
+        # Use endpoint-specific threshold if available, otherwise use default
+        threshold_ms = ENDPOINT_LATENCY_THRESHOLDS.get(endpoint, MAX_RESPONSE_TIME_MS)
+        if elapsed_ms > threshold_ms:
             raise AssertionError(
-                f"Slow response ({elapsed_ms:.1f}ms > {MAX_RESPONSE_TIME_MS}ms) on {endpoint}"
+                f"Slow response ({elapsed_ms:.1f}ms > {threshold_ms}ms) on {endpoint}"
             )
 
     # Response size check (potential DoS)

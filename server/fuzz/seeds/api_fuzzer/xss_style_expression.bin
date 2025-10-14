@@ -1,0 +1,1 @@
+{"intended_for": "<div style=xss:expression(alert(1))>"}

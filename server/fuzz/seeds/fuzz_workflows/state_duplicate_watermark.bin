@@ -1,1 +1,1 @@
-[{"action": "login", "email": "user@test.com", "password": "pass"}, {"action": "create_watermark", "documentid": 1, "method": "basic"}, {"action": "create_watermark", "documentid": 1, "method": "basic"}]
+[{"action": "login", "email": "user@test.com", "password": "pass"}, {"action": "create_watermark", "documentid": 1, "method": "basic", "secret": "test-secret", "key": "test-key"}, {"action": "create_watermark", "documentid": 1, "method": "basic", "secret": "test-secret", "key": "test-key"}]

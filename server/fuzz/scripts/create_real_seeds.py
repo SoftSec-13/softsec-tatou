@@ -1184,8 +1184,8 @@ startxref
 
 
 def create_stateful_fuzzer_seeds() -> None:
-    """Create seeds for stateful fuzzer - 100+ workflow patterns."""
-    seed_dir = Path("server/fuzz/seeds/stateful_fuzzer")
+    """Create seeds for stateful/workflow fuzzer - 60 workflow patterns with only supported actions."""
+    seed_dir = Path("server/fuzz/seeds/fuzz_workflows")
     ensure_dir(seed_dir)
 
     seeds = []
@@ -1259,24 +1259,27 @@ def create_stateful_fuzzer_seeds() -> None:
                     "email": "user@test.com",
                     "password": "password123",
                 },
-                {"action": "get_methods"},
-                {"action": "create_watermark", "documentid": 1, "method": "basic"},
-                {"action": "create_watermark", "documentid": 1, "method": "advanced"},
-                {"action": "create_watermark", "documentid": 1, "method": "dct"},
-            ],
-        ),
-        (
-            "workflow_version_management.bin",
-            [
                 {
-                    "action": "login",
-                    "email": "user@test.com",
-                    "password": "password123",
+                    "action": "create_watermark",
+                    "documentid": 1,
+                    "method": "basic",
+                    "secret": "test-secret",
+                    "key": "test-key",
                 },
-                {"action": "create_watermark", "documentid": 1, "method": "basic"},
-                {"action": "list_versions", "documentid": 1},
-                {"action": "list_all_versions"},
-                {"action": "get_version", "link": "test-link"},
+                {
+                    "action": "create_watermark",
+                    "documentid": 1,
+                    "method": "advanced",
+                    "secret": "test-secret",
+                    "key": "test-key",
+                },
+                {
+                    "action": "create_watermark",
+                    "documentid": 1,
+                    "method": "dct",
+                    "secret": "test-secret",
+                    "key": "test-key",
+                },
             ],
         ),
     ]
@@ -1322,14 +1325,25 @@ def create_stateful_fuzzer_seeds() -> None:
             "idor_watermark_other_doc.bin",
             [
                 {"action": "login", "email": "attacker@test.com", "password": "pass"},
-                {"action": "create_watermark", "documentid": 999, "method": "basic"},
+                {
+                    "action": "create_watermark",
+                    "documentid": 999,
+                    "method": "basic",
+                    "secret": "test-secret",
+                    "key": "test-key",
+                },
             ],
         ),
         (
             "idor_read_watermark_other_doc.bin",
             [
                 {"action": "login", "email": "attacker@test.com", "password": "pass"},
-                {"action": "read_watermark", "documentid": 999},
+                {
+                    "action": "read_watermark",
+                    "documentid": 999,
+                    "method": "basic",
+                    "key": "test-key",
+                },
             ],
         ),
         (
@@ -1395,7 +1409,10 @@ def create_stateful_fuzzer_seeds() -> None:
             )
         )
 
-    # Session management attacks (20 seeds)
+    # Session management attacks
+    # Only include tests with supported actions: create_user, login, upload,
+    # list_documents, get_document, delete_document, create_watermark, read_watermark
+    # Removed: logout, sleep, save_token, restore_token, set_token
     session_attacks = [
         (
             "session_no_login_access.bin",
@@ -1403,175 +1420,7 @@ def create_stateful_fuzzer_seeds() -> None:
                 {"action": "list_documents"}  # Try without logging in
             ],
         ),
-        (
-            "session_logout_and_access.bin",
-            [
-                {"action": "login", "email": "user@test.com", "password": "pass"},
-                {"action": "logout"},
-                {"action": "list_documents"},  # Try after logout
-            ],
-        ),
-        (
-            "session_expired_token.bin",
-            [
-                {"action": "login", "email": "user@test.com", "password": "pass"},
-                {"action": "sleep", "seconds": 3600},  # Wait for token to expire
-                {"action": "list_documents"},
-            ],
-        ),
-        (
-            "session_token_reuse.bin",
-            [
-                {"action": "login", "email": "user1@test.com", "password": "pass"},
-                {"action": "save_token"},
-                {"action": "login", "email": "user2@test.com", "password": "pass"},
-                {"action": "restore_token"},  # Try to use user1's token
-                {"action": "list_documents"},
-            ],
-        ),
-        (
-            "session_concurrent_logins.bin",
-            [
-                {"action": "login", "email": "user@test.com", "password": "pass"},
-                {
-                    "action": "login",
-                    "email": "user@test.com",
-                    "password": "pass",
-                },  # Login again
-            ],
-        ),
-        (
-            "session_invalid_token.bin",
-            [
-                {"action": "set_token", "token": "invalid_token_12345"},
-                {"action": "list_documents"},
-            ],
-        ),
-        (
-            "session_empty_token.bin",
-            [{"action": "set_token", "token": ""}, {"action": "list_documents"}],
-        ),
-        (
-            "session_malformed_token.bin",
-            [
-                {"action": "set_token", "token": ":::invalid:::"},
-                {"action": "list_documents"},
-            ],
-        ),
-        (
-            "session_sql_injection_token.bin",
-            [
-                {"action": "set_token", "token": "' OR '1'='1"},
-                {"action": "list_documents"},
-            ],
-        ),
-        (
-            "session_xss_in_token.bin",
-            [
-                {"action": "set_token", "token": "<script>alert(1)</script>"},
-                {"action": "list_documents"},
-            ],
-        ),
     ]
-
-    # Generate more session attacks
-    for i in range(10):
-        session_attacks.append(
-            (
-                f"session_rapid_login_logout_{i}.bin",
-                [
-                    {
-                        "action": "login",
-                        "email": f"user{i}@test.com",
-                        "password": "pass",
-                    },
-                    {"action": "logout"},
-                    {
-                        "action": "login",
-                        "email": f"user{i}@test.com",
-                        "password": "pass",
-                    },
-                    {"action": "logout"},
-                ]
-                * 5,
-            )
-        )
-
-    # Race condition tests (20 seeds)
-    race_conditions = [
-        (
-            "race_simultaneous_upload.bin",
-            [
-                {"action": "login", "email": "user@test.com", "password": "pass"},
-                {
-                    "action": "concurrent_upload",
-                    "count": 10,
-                    "intended_for": "test@test.com",
-                },
-            ],
-        ),
-        (
-            "race_simultaneous_delete.bin",
-            [
-                {"action": "login", "email": "user@test.com", "password": "pass"},
-                {"action": "concurrent_delete", "documentid": 1, "count": 10},
-            ],
-        ),
-        (
-            "race_create_watermark.bin",
-            [
-                {"action": "login", "email": "user@test.com", "password": "pass"},
-                {
-                    "action": "concurrent_watermark",
-                    "documentid": 1,
-                    "method": "basic",
-                    "count": 10,
-                },
-            ],
-        ),
-        (
-            "race_read_and_delete.bin",
-            [
-                {"action": "login", "email": "user@test.com", "password": "pass"},
-                {"action": "concurrent_read_delete", "documentid": 1},
-            ],
-        ),
-        (
-            "race_double_spend_document.bin",
-            [
-                {"action": "login", "email": "user@test.com", "password": "pass"},
-                {
-                    "action": "concurrent_create_watermark",
-                    "documentid": 1,
-                    "methods": ["basic", "advanced"],
-                },
-            ],
-        ),
-    ]
-
-    # Generate more race condition tests
-    for i in range(15):
-        race_conditions.append(
-            (
-                f"race_mixed_operations_{i}.bin",
-                [
-                    {"action": "login", "email": "user@test.com", "password": "pass"},
-                    {
-                        "action": "concurrent_mixed",
-                        "operations": [
-                            {"action": "upload", "intended_for": "test@test.com"},
-                            {"action": "list_documents"},
-                            {"action": "delete_document", "documentid": i},
-                            {
-                                "action": "create_watermark",
-                                "documentid": i + 1,
-                                "method": "basic",
-                            },
-                        ],
-                    },
-                ],
-            )
-        )
 
     # State transition attacks (20 seeds)
     state_attacks = [
@@ -1588,18 +1437,32 @@ def create_stateful_fuzzer_seeds() -> None:
             [
                 {"action": "login", "email": "user@test.com", "password": "pass"},
                 {"action": "delete_document", "documentid": 1},
-                {"action": "create_watermark", "documentid": 1, "method": "basic"},
+                {
+                    "action": "create_watermark",
+                    "documentid": 1,
+                    "method": "basic",
+                    "secret": "test-secret",
+                    "key": "test-key",
+                },
             ],
         ),
         (
             "state_duplicate_watermark.bin",
             [
                 {"action": "login", "email": "user@test.com", "password": "pass"},
-                {"action": "create_watermark", "documentid": 1, "method": "basic"},
                 {
                     "action": "create_watermark",
                     "documentid": 1,
                     "method": "basic",
+                    "secret": "test-secret",
+                    "key": "test-key",
+                },
+                {
+                    "action": "create_watermark",
+                    "documentid": 1,
+                    "method": "basic",
+                    "secret": "test-secret",
+                    "key": "test-key",
                 },  # Same method twice
             ],
         ),
@@ -1607,7 +1470,12 @@ def create_stateful_fuzzer_seeds() -> None:
             "state_read_before_create_watermark.bin",
             [
                 {"action": "login", "email": "user@test.com", "password": "pass"},
-                {"action": "read_watermark", "documentid": 1},  # Read before creating
+                {
+                    "action": "read_watermark",
+                    "documentid": 1,
+                    "method": "basic",
+                    "key": "test-key",
+                },  # Read before creating
             ],
         ),
         (
@@ -1617,13 +1485,15 @@ def create_stateful_fuzzer_seeds() -> None:
                     "action": "create_watermark",
                     "documentid": 1,
                     "method": "basic",
+                    "secret": "test-secret",
+                    "key": "test-key",
                 },  # Before login
                 {"action": "login", "email": "user@test.com", "password": "pass"},
             ],
         ),
     ]
 
-    # Generate more state attacks
+    # Generate more state attacks (without logout which is unsupported)
     for i in range(15):
         state_attacks.append(
             (
@@ -1632,22 +1502,26 @@ def create_stateful_fuzzer_seeds() -> None:
                     {"action": "delete_document", "documentid": i},
                     {"action": "login", "email": "user@test.com", "password": "pass"},
                     {"action": "get_document", "documentid": i},
-                    {"action": "create_watermark", "documentid": i, "method": "basic"},
-                    {"action": "logout"},
-                    {"action": "read_watermark", "documentid": i},
+                    {
+                        "action": "create_watermark",
+                        "documentid": i,
+                        "method": "basic",
+                        "secret": "test-secret",
+                        "key": "test-key",
+                    },
+                    {
+                        "action": "read_watermark",
+                        "documentid": i,
+                        "method": "basic",
+                        "key": "test-key",
+                    },
                     {"action": "upload", "intended_for": "test@test.com"},
                 ],
             )
         )
 
     # Combine all
-    all_seeds = (
-        valid_workflows
-        + idor_attacks
-        + session_attacks
-        + race_conditions
-        + state_attacks
-    )
+    all_seeds = valid_workflows + idor_attacks + session_attacks + state_attacks
 
     # Write seeds
     for filename, workflow in all_seeds:

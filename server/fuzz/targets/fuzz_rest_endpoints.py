@@ -47,8 +47,8 @@ def fuzz_one_input(data: bytes) -> None:
 
     fdp = atheris.FuzzedDataProvider(data)
 
-    # Select endpoint
-    endpoint_choice = fdp.ConsumeIntInRange(0, 7)
+    # Select endpoint (now includes get-version and metrics)
+    endpoint_choice = fdp.ConsumeIntInRange(0, 9)
 
     app = get_app()
 
@@ -143,7 +143,7 @@ def fuzz_one_input(data: bytes) -> None:
                     resp, "/api/create-watermark", start_time
                 )
 
-            else:  # endpoint_choice == 7
+            elif endpoint_choice == 7:
                 # read-watermark
                 doc_id = fdp.ConsumeIntInRange(1, 1000)
                 payload = build_read_watermark(doc_id, fdp)
@@ -155,6 +155,71 @@ def fuzz_one_input(data: bytes) -> None:
                 )
                 check_endpoint_invariants(resp, "/api/read-watermark")
                 check_security_vulnerabilities(resp, "/api/read-watermark", start_time)
+
+            elif endpoint_choice == 8:
+                # get-version/<link> - fuzz path parameter with valid/invalid hex
+                link_length = fdp.PickValueInArray([32, 64])
+
+                # Generate hex string with potential mutations
+                if fdp.remaining_bytes() > link_length and fdp.ConsumeBool():
+                    # Valid hex
+                    link = fdp.ConsumeBytes(link_length // 2).hex()
+                else:
+                    # Invalid: non-hex, wrong length, mixed case, special chars
+                    mutation_type = fdp.ConsumeIntInRange(0, 4)
+                    if mutation_type == 0:
+                        # Non-hex characters
+                        link = (
+                            fdp.ConsumeUnicodeNoSurrogates(link_length)
+                            or "g" * link_length
+                        )
+                    elif mutation_type == 1:
+                        # Wrong length
+                        link = fdp.ConsumeBytes(fdp.ConsumeIntInRange(1, 128)).hex()
+                    elif mutation_type == 2:
+                        # Mixed case (should be lowercase)
+                        link = fdp.ConsumeBytes(link_length // 2).hex().upper()
+                    elif mutation_type == 3:
+                        # Special characters
+                        link = "../" * (link_length // 3) + "a" * (link_length % 3)
+                    else:
+                        # Empty or very short
+                        link = fdp.ConsumeUnicodeNoSurrogates(
+                            fdp.ConsumeIntInRange(0, 5)
+                        )
+
+                auth_header = build_fuzzed_auth(fdp)
+                resp = client.get(
+                    f"/api/get-version/{link}",
+                    headers={"Authorization": auth_header},
+                )
+                check_endpoint_invariants(resp, "/api/get-version")
+                check_security_vulnerabilities(resp, "/api/get-version", start_time)
+
+            else:  # endpoint_choice == 9
+                # /metrics - fuzz X-Metrics-Token header
+                if fdp.remaining_bytes() and fdp.ConsumeBool():
+                    # Try valid-looking token
+                    metrics_token = fdp.ConsumeUnicodeNoSurrogates(64) or "test-token"
+                else:
+                    # Invalid tokens
+                    mutation_type = fdp.ConsumeIntInRange(0, 3)
+                    if mutation_type == 0:
+                        metrics_token = ""
+                    elif mutation_type == 1:
+                        metrics_token = "' OR 1=1--"
+                    elif mutation_type == 2:
+                        metrics_token = "../../../etc/passwd"
+                    else:
+                        metrics_token = None  # type: ignore[assignment]
+
+                headers = {}
+                if metrics_token is not None:
+                    headers["X-Metrics-Token"] = metrics_token
+
+                resp = client.get("/metrics", headers=headers)
+                check_endpoint_invariants(resp, "/metrics")
+                check_security_vulnerabilities(resp, "/metrics", start_time)
 
     except (SystemExit, KeyboardInterrupt):
         raise

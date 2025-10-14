@@ -1,0 +1,78 @@
+# PDF structure (same as apply)
+"%PDF-"
+"%%EOF"
+"xref"
+"trailer"
+"obj"
+"endobj"
+"stream"
+"endstream"
+
+# Reading watermarks from structure
+"/Type"
+"/Page"
+"/Pages"
+"/Catalog"
+"/Contents"
+"/Annot"
+"/Metadata"
+"/Info"
+
+# XMP and metadata extraction
+"rdf:Description"
+"x:xmpmeta"
+"xmp:"
+"dc:"
+"pdf:"
+"xmpMM:"
+"adobe:ns:meta/"
+"tatou:"
+"watermark"
+"fragment"
+"index"
+"total"
+
+# Signature manifest
+"/ByteRange"
+"/Contents"
+"/SubFilter"
+"/adbe.pkcs7.detached"
+"/DocMDP"
+"/UR"
+
+# Encryption (for key validation)
+"/Encrypt"
+"/P"
+"/R"
+"/V"
+
+# Text extraction
+"BT"
+"ET"
+"Tj"
+"TJ"
+"Tm"
+"Td"
+
+# DCT marker detection
+"\xff\xd8"
+"\xff\xd9"
+"JFIF"
+"Exif"
+
+# Stream filters
+"/Filter"
+"/FlateDecode"
+"/DCTDecode"
+
+# References
+" R"
+" 0 R"
+"null"
+
+# Delimiters
+"<<"
+">>"
+"/"
+"["
+"]"

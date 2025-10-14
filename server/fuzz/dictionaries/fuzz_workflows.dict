@@ -1,0 +1,62 @@
+# Workflow action names
+"action"
+"create_user"
+"login"
+"upload"
+"list_documents"
+"get_document"
+"delete_document"
+"create_watermark"
+"read_watermark"
+
+# Common field names
+"email"
+"password"
+"documentid"
+"intended_for"
+"method"
+"key"
+"secret"
+"filename"
+"position"
+
+# User/auth values
+"user@test.com"
+"attacker@test.com"
+"admin@test.com"
+"pass"
+"password123"
+"SecurePass123!"
+
+# Document IDs (for IDOR testing)
+"1"
+"0"
+"-1"
+"999"
+"9999"
+"2147483647"
+
+# Watermark methods
+"basic"
+"advanced"
+"dct"
+"robust-xmp"
+"signature-manifest"
+
+# JSON structure tokens
+"["
+"]"
+"{"
+"}"
+","
+":"
+"null"
+"true"
+"false"
+
+# Attack patterns in workflow context
+"' OR 1=1--"
+"<script>"
+"../"
+"admin"
+"root"

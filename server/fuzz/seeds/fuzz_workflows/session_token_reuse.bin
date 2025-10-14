@@ -1,1 +1,0 @@
-[{"action": "login", "email": "user1@test.com", "password": "pass"}, {"action": "save_token"}, {"action": "login", "email": "user2@test.com", "password": "pass"}, {"action": "restore_token"}, {"action": "list_documents"}]

