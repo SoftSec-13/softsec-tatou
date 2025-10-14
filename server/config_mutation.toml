@@ -1,0 +1,13 @@
+[cosmic-ray]
+modules = ["src"]            # your Python package name
+module-path = "."       # folder containing your package
+test-command = "pytest server/test/"
+baseline = 10
+timeout = 15
+
+[cosmic-ray.distributor]
+name = "local"
+
+[cosmic-ray.runner]
+runner = "local"
+timeout = 15

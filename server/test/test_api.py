@@ -7,6 +7,19 @@ import os
 from werkzeug.datastructures import FileStorage
 from unittest.mock import patch, PropertyMock
 from flask import g, request
+import subprocess
+import os
+from time import sleep
+
+#Run environment preparation file
+print("Running prepare_env.bat...")
+result = subprocess.run(
+        ['.\\prepare_env.bat'],
+        #['C:\\Users\\franc\\Documents\\GitHub\\softsec-tatou\\server\\test\\test_api.py'],
+        shell=True)
+#Wait for db to be ready
+print("Waiting for db to be ready...")
+sleep(10)
 
 # Add the src directory to the Python path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -119,7 +132,7 @@ def test_login_route(client):
 def test_upload_document_route(client):
     """Test document upload endpoint."""
     #open dummy file
-    with open("storage\\files\\username\\input.pdf", "rb") as f:
+    with open("C:\\Users\\franc\\Documents\\GitHub\\softsec-tatou\\server\\test\\storage\\files\\username\\input.pdf", "rb") as f:
         parameters = {
             "file": (f, "input.pdf"),
             "name": "My File"
@@ -359,7 +372,7 @@ def test_create_watermark_route(client):
 def test_read_watermark_route(client):
     """Test read watermark endpoint."""
     #Upload watermarked file to the app
-    with open("storage\\files\\username\\watermarked.pdf", "rb") as f:
+    with open("C:\\Users\\franc\\Documents\\GitHub\\softsec-tatou\\server\\test\\storage\\files\\username\\input.pdf", "rb") as f:
         data = {
             "file": (f, "watermarked.pdf"),
             "name": "Water File"
