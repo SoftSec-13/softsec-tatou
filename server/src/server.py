@@ -69,7 +69,11 @@ def create_app():
     def get_engine():
         eng = app.config.get("_ENGINE")
         if eng is None:
-            eng = create_engine(db_url(), pool_pre_ping=True, future=True)
+            try:
+                eng = create_engine(db_url(), pool_pre_ping=True, future=True)
+            except Exception as e:
+                app.logger.critical("Failed to initialize database engine: %s", e)
+                raise
             app.config["_ENGINE"] = eng
         return eng
 
@@ -78,14 +82,14 @@ def create_app():
         try:
             RMAPHandler(app, str(app.config["STORAGE_DIR"]), get_engine)
         except Exception as e:  # pragma: no cover - defensive; don't fail app
-            app.logger.warning(f"RMAP initialization failed (continuing): {e}")
+            app.logger.warning("RMAP initialization failed (continuing): %s", e)
 
     # --- Helpers ---
     def _serializer():
         return URLSafeTimedSerializer(app.config["SECRET_KEY"], salt="ljkdsad123123kjd")
 
     def _auth_error(msg: str, code: int = 401):
-        app.logger.warning(f"Auth error ({code}): {msg}")
+        app.logger.warning("Auth error (%s): %s", code, msg)
         return jsonify({"error": msg}), code
 
     def require_auth(f):
@@ -132,9 +136,9 @@ def create_app():
                 if cl is not None:
                     observe_request_size(request.method, route, cl)
             except Exception as exc:  # pragma: no cover - soft fail
-                app.logger.error("request size capture failed: %s", exc)
+                app.logger.warning("Request size capture failed: %s", exc)
         except Exception as exc:  # pragma: no cover - defensive
-            app.logger.error("before_request instrumentation failed: %s", exc)
+            app.logger.warning("before_request instrumentation failed: %s", exc)
 
     @app.after_request  # type: ignore
     def _tatou_after(resp):
@@ -145,7 +149,7 @@ def create_app():
                 route = request.url_rule.rule if request.url_rule else request.path
                 record_request(request.method, route, resp.status_code, dur)
         except Exception as exc:  # pragma: no cover - defensive
-            app.logger.error("after_request instrumentation failed: %s", exc)
+            app.logger.warning("after_request instrumentation failed: %s", exc)
         return resp
 
     # --- Routes ---
@@ -265,7 +269,7 @@ def create_app():
                     return jsonify({"error": "invalid credentials"}), 401
 
         except Exception as e:
-            app.logger.error(f"Database error in login: {str(e)}")
+            app.logger.error("Database error in login: %s", e)
             inc_db_error("login_select")
             return jsonify({"error": "An error occurred"}), 503
 
@@ -342,7 +346,7 @@ def create_app():
 
             file.save(stored_path)
         except Exception as e:
-            app.logger.error(f"File save error: {str(e)}")
+            app.logger.error("File save error: %s", e)
             return jsonify({"error": "failed to save file"}), 500
 
         sha_hex = _sha256_file(stored_path)
@@ -378,7 +382,11 @@ def create_app():
                 ).one()
         except Exception:
             stored_path.unlink(missing_ok=True)
-            app.logger.error(f"Database error: {stored_path}, {int(g.user['id'])}")
+            app.logger.error(
+                "Database error inserting document path=%s user=%s",
+                stored_path,
+                int(g.user["id"]),
+            )
             inc_db_error("insert_document")
             return jsonify({"error": "database error occurred"}), 503
 
@@ -413,7 +421,9 @@ def create_app():
                     {"uid": int(g.user["id"])},
                 ).all()
         except Exception:
-            app.logger.error(f"Database error in list_documents: {g.user['id']}")
+            app.logger.error(
+                "Database error in list_documents for user=%s", g.user["id"]
+            )
             inc_db_error("list_documents")
             return jsonify({"error": "An error occurred while fetching documents"}), 503
 
@@ -527,7 +537,9 @@ def create_app():
             app.logger.error("Invalid user ID in auth token")
             return jsonify({"error": "Authentication error"}), 401
         except Exception:
-            app.logger.error(f"Database error in list_all_versions: {g.user['id']}")
+            app.logger.error(
+                "Database error in list_all_versions for user=%s", g.user["id"]
+            )
             inc_db_error("list_all_versions")
             return jsonify({"error": "An error occurred while fetching versions"}), 503
 
@@ -658,7 +670,9 @@ def create_app():
         except Exception as e:
             f.close()
             # Log error and return generic message
-            app.logger.error(f"Error serving file: {str(e)}")
+            app.logger.error(
+                "Error serving file for document id=%s: %s", document_id, e
+            )
             return jsonify({"error": "error serving file"}), 500
 
     # GET /api/get-version/<link>  → returns the watermarked PDF (inline)
