@@ -935,7 +935,7 @@ def create_app():
                     {"id": doc_id, "owner": int(g.user["id"])},
                 ).first()
         except Exception as e:
-            app.logger.exception("Database error fetching document %s", e)
+            app.logger.error("Database error fetching document %s", e)
             return jsonify({"error": "database error"}), 503
 
         if not row:
@@ -974,8 +974,8 @@ def create_app():
                 return jsonify({"error": "watermarking method not applicable"}), 400
         except Exception as e:
             inc_watermark_failed(method, "applicability_exception")
-            app.logger.exception(
-                "Watermark applicability check failed for document %s", e
+            app.logger.error(
+                "Watermark applicability check failed for document %s: %s", doc_id, e
             )
             return jsonify({"error": "watermark applicability check failed"}), 400
 
@@ -1001,7 +1001,7 @@ def create_app():
                 return jsonify({"error": "watermarking produced no output"}), 500
         except Exception as e:
             inc_watermark_failed(method, "exception")
-            app.logger.exception(
+            app.logger.error(
                 "Watermarking failed for document %s using method %s: %s",
                 doc_id,
                 method,
@@ -1023,7 +1023,7 @@ def create_app():
             with dest_path.open("wb") as f:
                 f.write(wm_bytes)
         except Exception as e:
-            app.logger.exception(
+            app.logger.error(
                 "Failed to write watermarked file %s for document %s: %s",
                 dest_path,
                 doc_id,
@@ -1056,6 +1056,19 @@ def create_app():
                     },
                 )
                 vid = int(conn.execute(text("SELECT LAST_INSERT_ID()")).scalar())
+        except IntegrityError as ie:
+            # This should be very rare due to SHA-256 usage, but handle it just in case
+            try:
+                dest_path.unlink(missing_ok=True)
+            except Exception as cleanup_error:
+                app.logger.warning(
+                    f"Failed to cleanup file {dest_path}: {cleanup_error}"
+                )
+            app.logger.error(
+                "Integrity error during version insert for document %s: %s", doc_id, ie
+            )
+            inc_db_error("insert_version")
+            return jsonify({"error": "database error during version insert"}), 503
         except Exception:
             try:
                 dest_path.unlink(missing_ok=True)
@@ -1063,7 +1076,7 @@ def create_app():
                 app.logger.warning(
                     f"Failed to cleanup file {dest_path}: {cleanup_error}"
                 )
-            app.logger.exception(
+            app.logger.error(
                 "Database error during version insert for document %s", doc_id
             )
             inc_db_error("insert_version")
@@ -1148,7 +1161,7 @@ def create_app():
                     {"id": doc_id, "owner": int(g.user["id"])},
                 ).first()
         except Exception as e:
-            app.logger.exception(
+            app.logger.error(
                 "Database error fetching document %s for watermark read: %s", doc_id, e
             )
             return jsonify({"error": "database error"}), 503
@@ -1178,7 +1191,7 @@ def create_app():
         try:
             secret = WMUtils.read_watermark(method=method, pdf=str(file_path), key=key)
         except Exception as e:
-            app.logger.exception(
+            app.logger.error(
                 "Error when attempting to read watermark for document %s: %s", doc_id, e
             )
             return jsonify({"error": "error when attempting to read watermark"}), 400
