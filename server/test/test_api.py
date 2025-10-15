@@ -480,7 +480,6 @@ def encrypt_payload_for_server(data: dict) -> str:
     b64_encoded = base64.b64encode(armored_pgp.encode("utf-8")).decode("utf-8")
     return b64_encoded
 
-
 def decrypt_server_response(payload_b64: str, client_privkey_path: str, passphrase: str = "") -> dict:
     #Load key
     client_key, _ = pgpy.PGPKey.from_file(client_privkey_path)
@@ -508,13 +507,14 @@ def test_rmap_initiate(client):
         "identity": test_identity
     })
 
+    # Call route
     response = client.post("/rmap-initiate", json={"payload": encrypted_payload})
 
     assert response.status_code == 200
     json_data = response.get_json()
     assert "payload" in json_data
 
-    # Optional: decrypt and inspect response payload
+    # Decrypt and inspect response payload
     decrypted = decrypt_server_response(
         json_data["payload"],
         client_privkey_path=str(Path(__file__).parent.parent / "client_keys" / "group13-private.asc"),
@@ -522,6 +522,15 @@ def test_rmap_initiate(client):
     )
     assert decrypted["nonceClient"] == test_nonce
     assert isinstance(decrypted["nonceServer"], int)
+
+    # Test with wrong parameters
+    # Missing params
+    response = client.post("/rmap-initiate")
+    assert response.status_code == 400
+
+    # Wrong format params
+    response = client.post("/rmap-initiate", json={"payload":"wrongformatstring"})
+    assert response.status_code == 503
 
 
 def test_rmap_get_link(client):
@@ -565,3 +574,12 @@ def test_rmap_get_link(client):
     assert "result" in json_data
     assert isinstance(json_data["result"], str)
     assert len(json_data["result"]) == 32
+
+    # Test with wrong parameters
+    # Missing params
+    response = client.post("/rmap-get-link")
+    assert response.status_code == 400
+
+    # Wrong format params
+    response = client.post("/rmap-get-link", json={"payload":"wrongformatstring"})
+    assert response.status_code == 503
