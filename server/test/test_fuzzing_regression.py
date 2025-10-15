@@ -8,15 +8,11 @@ Each test corresponds to a bug documented in server/fuzz/FIXED_BUGS.md.
 
 from __future__ import annotations
 
-import base64
 import json
-import secrets
 from io import BytesIO
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
-from werkzeug.datastructures import FileStorage
 
 # Import the local app factory from the src-layout package.
 # When running pytest from the server/ directory, importing `server` would
@@ -30,7 +26,7 @@ def app():
     """Create Flask app for testing."""
     test_app = create_app()
     test_app.config["TESTING"] = True
-    test_app.config["STORAGE_DIR"] = Path("/tmp/test_tatou_storage")
+    test_app.config["STORAGE_DIR"] = Path("/tmp/test_tatou_storage")  # nosec B108
     test_app.config["STORAGE_DIR"].mkdir(parents=True, exist_ok=True)
     return test_app
 
@@ -47,7 +43,9 @@ def auth_token(app):
     from itsdangerous import URLSafeTimedSerializer
 
     serializer = URLSafeTimedSerializer(app.config["SECRET_KEY"], salt="tatou-auth")
-    return serializer.dumps({"uid": 1, "login": "testuser", "email": "test@example.com"})
+    return serializer.dumps(
+        {"uid": 1, "login": "testuser", "email": "test@example.com"}
+    )
 
 
 # ============================================================================
@@ -70,10 +68,17 @@ class TestBug1_PBKDF2_DoS:
         method = SignedAnnotationWatermark()
 
         # Create a minimal valid PDF
-        minimal_pdf = b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Count 1/Kids[3 0 R]>>endobj 3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Parent 2 0 R>>endobj\nxref\n0 4\n0000000000 65535 f\n0000000009 00000 n\n0000000058 00000 n\n0000000115 00000 n\ntrailer<</Size 4/Root 1 0 R>>\nstartxref\n190\n%%EOF"
+        minimal_pdf = (
+            b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj "
+            b"2 0 obj<</Type/Pages/Count 1/Kids[3 0 R]>>endobj "
+            b"3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Parent 2 0 R>>endobj\n"
+            b"xref\n0 4\n0000000000 65535 f\n0000000009 00000 n\n"
+            b"0000000058 00000 n\n0000000115 00000 n\n"
+            b"trailer<</Size 4/Root 1 0 R>>\nstartxref\n190\n%%EOF"
+        )
 
         # Test with maximum allowed iterations (300k)
-        secret = "test_secret"
+        secret = "test_secret"  # pragma: allowlist secret  # nosec B105
         key = "test_key_300k"
 
         # Apply watermark with default iterations (should work)
@@ -101,10 +106,17 @@ class TestBug1_PBKDF2_DoS:
         method = SignedAnnotationWatermark()
 
         # Create a minimal valid PDF
-        minimal_pdf = b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Count 1/Kids[3 0 R]>>endobj 3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Parent 2 0 R>>endobj\nxref\n0 4\n0000000000 65535 f\n0000000009 00000 n\n0000000058 00000 n\n0000000115 00000 n\ntrailer<</Size 4/Root 1 0 R>>\nstartxref\n190\n%%EOF"
+        minimal_pdf = (
+            b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj "
+            b"2 0 obj<</Type/Pages/Count 1/Kids[3 0 R]>>endobj "
+            b"3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Parent 2 0 R>>endobj\n"
+            b"xref\n0 4\n0000000000 65535 f\n0000000009 00000 n\n"
+            b"0000000058 00000 n\n0000000115 00000 n\n"
+            b"trailer<</Size 4/Root 1 0 R>>\nstartxref\n190\n%%EOF"
+        )
 
         # First, create a valid watermarked PDF
-        secret = "test_secret"
+        secret = "test_secret"  # pragma: allowlist secret  # nosec B105
         key = "test_key_malicious"
         watermarked = method.add_watermark(
             pdf=minimal_pdf, secret=secret, key=key, intended_for="test_user"
@@ -154,12 +166,19 @@ class TestBug1_PBKDF2_DoS:
 
         method = SignedAnnotationWatermark()
 
-        minimal_pdf = b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Count 1/Kids[3 0 R]>>endobj 3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Parent 2 0 R>>endobj\nxref\n0 4\n0000000000 65535 f\n0000000009 00000 n\n0000000058 00000 n\n0000000115 00000 n\ntrailer<</Size 4/Root 1 0 R>>\nstartxref\n190\n%%EOF"
+        minimal_pdf = (
+            b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj "
+            b"2 0 obj<</Type/Pages/Count 1/Kids[3 0 R]>>endobj "
+            b"3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Parent 2 0 R>>endobj\n"
+            b"xref\n0 4\n0000000000 65535 f\n0000000009 00000 n\n"
+            b"0000000058 00000 n\n0000000115 00000 n\n"
+            b"trailer<</Size 4/Root 1 0 R>>\nstartxref\n190\n%%EOF"
+        )
 
         try:
             import pymupdf
 
-            secret = "test_secret"
+            secret = "test_secret"  # pragma: allowlist secret  # nosec B105
             key = "test_key_zero"
             watermarked = method.add_watermark(
                 pdf=minimal_pdf, secret=secret, key=key, intended_for="test_user"
@@ -198,12 +217,19 @@ class TestBug1_PBKDF2_DoS:
 
         method = SignedAnnotationWatermark()
 
-        minimal_pdf = b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Count 1/Kids[3 0 R]>>endobj 3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Parent 2 0 R>>endobj\nxref\n0 4\n0000000000 65535 f\n0000000009 00000 n\n0000000058 00000 n\n0000000115 00000 n\ntrailer<</Size 4/Root 1 0 R>>\nstartxref\n190\n%%EOF"
+        minimal_pdf = (
+            b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj "
+            b"2 0 obj<</Type/Pages/Count 1/Kids[3 0 R]>>endobj "
+            b"3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Parent 2 0 R>>endobj\n"
+            b"xref\n0 4\n0000000000 65535 f\n0000000009 00000 n\n"
+            b"0000000058 00000 n\n0000000115 00000 n\n"
+            b"trailer<</Size 4/Root 1 0 R>>\nstartxref\n190\n%%EOF"
+        )
 
         try:
             import pymupdf
 
-            secret = "test_secret"
+            secret = "test_secret"  # pragma: allowlist secret  # nosec B105
             key = "test_key_negative"
             watermarked = method.add_watermark(
                 pdf=minimal_pdf, secret=secret, key=key, intended_for="test_user"
@@ -356,9 +382,9 @@ class TestBug2_ContentLength_TypeError:
             else:
                 result = True
 
-            assert (
-                result == should_pass
-            ), f"content_length={content_length}, expected={should_pass}, got={result}"
+            assert result == should_pass, (
+                f"content_length={content_length}, expected={should_pass}, got={result}"
+            )
 
 
 # ============================================================================
@@ -380,9 +406,9 @@ class TestRegressionCorpus:
         # This test documents the expected structure
         if corpus_dir.exists():
             assert corpus_dir.is_dir()
-            # Check for documented crashes
-            documented_crashes = ["bug1_pbkdf2_dos.bin", "bug2_content_length_none.bin"]
-            # Note: These files may not exist yet, but should be added as bugs are found
+            # Note: Crash artifacts like bug1_pbkdf2_dos.bin and
+            # bug2_content_length_none.bin may not exist yet,
+            # but should be added as bugs are found
 
     def test_no_unhandled_crashes_in_latest_run(self):
         """Verify that latest fuzzing run had no unhandled crashes.

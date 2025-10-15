@@ -113,3 +113,17 @@ module = [
     "dill.*",
 ]
 ignore_missing_imports = true
+
+[tool.bandit]
+# Exclude test directories from certain bandit checks
+# B101: Use of assert (standard in pytest)
+# B105: Hardcoded password string (test fixtures use dummy passwords/secrets)
+skips = []
+
+[tool.bandit.assert_used]
+skips = ["*/test/*", "*/tests/*"]
+
+[[tool.bandit.overrides]]
+# Ignore B101 (assert) and B105 (hardcoded password) in test files
+paths = ["test"]
+skips = ["B101", "B105"]
