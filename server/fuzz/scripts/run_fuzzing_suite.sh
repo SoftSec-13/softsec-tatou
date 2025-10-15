@@ -14,11 +14,20 @@ COLLECT_COVERAGE="${FUZZ_COLLECT_COVERAGE:-1}"
 mkdir -p "${OUTPUT_DIR}/targets"
 
 echo "=== Tatou Fuzzing Suite ==="
+echo "Working directory: $(pwd)"
 echo "Time per fuzzer: ${FUZZ_TIME}s"
 echo "Max input: ${MAX_LEN} bytes"
 echo "Workers: ${WORKERS}"
 echo "Output: ${OUTPUT_DIR}"
 echo "Coverage: ${COLLECT_COVERAGE}"
+echo ""
+echo "Directory structure check:"
+echo "  fuzz/ exists: $([ -d fuzz ] && echo 'yes' || echo 'NO')"
+echo "  fuzz/targets/ exists: $([ -d fuzz/targets ] && echo 'yes' || echo 'NO')"
+echo "  fuzz/dictionaries/ exists: $([ -d fuzz/dictionaries ] && echo 'yes' || echo 'NO')"
+if [ -d fuzz/targets ]; then
+  echo "  fuzz/targets/ files: $(ls fuzz/targets/*.py 2>/dev/null | wc -l)"
+fi
 echo
 
 # Fuzzing targets with per-target configurations
@@ -59,6 +68,16 @@ for fuzzer_config in "${FUZZERS[@]}"; do
   corpus_dir="fuzz/corpus/${fuzzer_base}"
   seeds_dir="fuzz/seeds/${fuzzer_base}"
   dict_file="fuzz/dictionaries/${fuzzer_base}.dict"
+  fuzzer_file="fuzz/${fuzzer}.py"
+
+  # Verify fuzzer file exists
+  if [[ ! -f "${fuzzer_file}" ]]; then
+    echo "✗ Fuzzer file not found: ${fuzzer_file}"
+    echo "  Available files:"
+    ls -la fuzz/targets/ 2>/dev/null || echo "  fuzz/targets/ directory not found"
+    failures=$((failures + 1))
+    continue
+  fi
 
   # Create corpus dir if missing
   mkdir -p "${corpus_dir}"
@@ -66,7 +85,7 @@ for fuzzer_config in "${FUZZERS[@]}"; do
   # Build fuzzer command with corpus (writable) and seeds (read-only)
   # Add 120s overhead for instrumentation (atheris startup is slow)
   fuzz_cmd=(
-    timeout $((FUZZ_TIME + 120)) ${COV_CMD} "fuzz/${fuzzer}.py"
+    timeout $((FUZZ_TIME + 120)) ${COV_CMD} "${fuzzer_file}"
     "${corpus_dir}"
   )
 
@@ -147,13 +166,17 @@ if [[ $crashes -gt 0 ]]; then
     artifact_name=$(basename "${artifact}")
     echo "  Processing ${artifact_name}..."
 
-    # Extract fuzzer name from artifact (format: fuzzer_crash-hash or fuzzer_oom-hash)
-    if [[ "${artifact_name}" =~ ^([^_]+)_(crash|oom|timeout)-(.+)$ ]]; then
+    # Extract fuzzer name from artifact
+    # Format: fuzzer_name_(crash|oom|timeout)-hash
+    # Need to handle fuzzer names with underscores (e.g., fuzz_pdf_apply_crash-hash)
+    if [[ "${artifact_name}" =~ ^(.+)_(crash|oom|timeout)-(.+)$ ]]; then
       fuzzer_name="${BASH_REMATCH[1]}"
       crash_type="${BASH_REMATCH[2]}"
       crash_hash="${BASH_REMATCH[3]}"
+      echo "    Fuzzer: ${fuzzer_name}, Type: ${crash_type}"
     else
-      echo "    ⚠ Could not parse artifact name, skipping minimization"
+      echo "    ⚠ Could not parse artifact name format: ${artifact_name}"
+      echo "    Expected format: fuzzer_name_(crash|oom|timeout)-hash"
       continue
     fi
 
@@ -196,12 +219,16 @@ if [[ $crashes -gt 0 ]]; then
   echo "Total artifacts: $crashes" >> "${summary_file}"
   echo "Unique buckets: ${#crash_buckets[@]}" >> "${summary_file}"
   echo "" >> "${summary_file}"
-  echo "Crashes by fuzzer and type:" >> "${summary_file}"
 
-  for bucket in "${!crash_buckets[@]}"; do
-    count="${crash_buckets[$bucket]}"
-    echo "  ${bucket}: ${count}" >> "${summary_file}"
-  done
+  if [[ ${#crash_buckets[@]} -gt 0 ]]; then
+    echo "Crashes by fuzzer and type:" >> "${summary_file}"
+    for bucket in "${!crash_buckets[@]}"; do
+      count="${crash_buckets[$bucket]}"
+      echo "  ${bucket}: ${count}" >> "${summary_file}"
+    done
+  else
+    echo "No crashes could be categorized (parsing issues)" >> "${summary_file}"
+  fi
 
   echo "" >> "${summary_file}"
   echo "Minimized artifacts saved to: ${OUTPUT_DIR}/triage/" >> "${summary_file}"

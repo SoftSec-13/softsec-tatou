@@ -8,7 +8,6 @@
 "endobj"
 "stream"
 "endstream"
-
 # Watermarking-specific
 "/Type"
 "/Page"
@@ -20,7 +19,6 @@
 "/XObject"
 "/ExtGState"
 "/ColorSpace"
-
 # Text and graphics operators
 "BT"
 "ET"
@@ -33,7 +31,6 @@
 "Q"
 "cm"
 "gs"
-
 # Metadata and XMP
 "/Metadata"
 "/Info"
@@ -43,13 +40,11 @@
 "xmp:"
 "dc:"
 "pdf:"
-
 # Encryption and security
 "/Encrypt"
 "/P"
 "/O"
 "/U"
-
 # DCT and image-specific
 "/DCTDecode"
 "/Image"
@@ -60,17 +55,14 @@
 "/DeviceRGB"
 "/DeviceGray"
 "/DeviceCMYK"
-
 # Stream filters
 "/Filter"
 "/FlateDecode"
 "/ASCIIHexDecode"
-
 # Object references
 " R"
 " 0 R"
 "null"
-
 # Delimiters
 "<<"
 ">>"

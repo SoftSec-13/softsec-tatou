@@ -12,7 +12,6 @@
 "file"
 "id"
 "link"
-
 # HTTP headers
 "Authorization"
 "Bearer "
@@ -21,7 +20,6 @@
 "application/pdf"
 "application/json"
 "multipart/form-data"
-
 # SQL injection patterns
 "' OR 1=1--"
 "' OR '1'='1"
@@ -30,7 +28,6 @@
 "1' OR '1' = '1"
 "; DROP TABLE"
 "' AND 1=0 UNION ALL SELECT"
-
 # XSS patterns
 "<script>"
 "<script>alert(1)</script>"
@@ -39,7 +36,6 @@
 "onload="
 "onclick="
 "<img src=x onerror=alert(1)>"
-
 # Path traversal
 "../"
 "../../"
@@ -48,7 +44,6 @@
 "%2e%2e%2f"
 "%2e%2e/"
 "....//....//....//etc/passwd"
-
 # Special characters and encoding
 "%00"
 "%0a"
@@ -56,11 +51,9 @@
 "\x00"
 "\n"
 "\r\n"
-
 # PDF indicators
 "%PDF-"
 "%%EOF"
-
 # Network locations (SSRF)
 "localhost"
 "127.0.0.1"
@@ -68,20 +61,17 @@
 "169.254.169.254"
 "[::1]"
 "http://localhost"
-
 # Watermark methods
 "basic"
 "advanced"
 "dct"
 "robust-xmp"
 "signature-manifest"
-
 # JWT/Auth tokens
 "eyJ"
 "Bearer eyJ"
 "null"
 "undefined"
-
 # Common attack values
 "admin"
 "root"
