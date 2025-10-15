@@ -33,8 +33,9 @@ from server import create_app
 @pytest.fixture
 def app():
     """Create and configure a new app instance for each test."""
-    app = create_app(testing=True)
+    app = create_app()
     app.config["TESTING"] = True
+    app.config["DB_HOST"] = "127.0.0.1"
     return app
 
 
