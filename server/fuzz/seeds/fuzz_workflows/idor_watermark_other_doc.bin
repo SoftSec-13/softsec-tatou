@@ -1,0 +1,1 @@
+[{"action": "login", "email": "attacker@test.com", "password": "pass"}, {"action": "create_watermark", "documentid": 999, "method": "basic", "secret": "test-secret", "key": "test-key"}]

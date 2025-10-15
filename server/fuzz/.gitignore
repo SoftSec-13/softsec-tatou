@@ -1,0 +1,31 @@
+# Runtime fuzzing artifacts (auto-generated)
+corpus/
+
+# Fuzzing results
+fuzzing_results_*/
+crash-*
+leak-*
+timeout-*
+oom-*
+slow-unit-*
+
+# Coverage data
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.coverage
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.py[cod]
+*$py.class
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+.DS_Store
