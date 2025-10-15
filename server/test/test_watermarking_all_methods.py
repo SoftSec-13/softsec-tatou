@@ -32,7 +32,8 @@ if not CASES:
 @pytest.fixture(scope="session")
 def sample_pdf_path() -> Path:
     """Sample pdf path."""
-    input_path = "C:\\Users\\franc\\Documents\\GitHub\\softsec-tatou\\server\\test\\storage\\files\\username\\input.pdf"
+    script_dir = Path(__file__).parent
+    input_path = script_dir / "storage" / "files" / "username" / "input.pdf"
     return Path(input_path)
 
 
