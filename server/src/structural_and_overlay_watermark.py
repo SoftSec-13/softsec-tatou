@@ -26,10 +26,7 @@ class StructuralOverlay(WatermarkingMethod):
 
     @staticmethod
     def get_usage() -> str:
-        return (
-            "Method that overlays a visible watermark as well as"
-            "embedding a structural watermark. "
-        )
+        return "Method that overlays a visible watermark."
 
     @staticmethod
     def visible_watermark(pdf_bytes: bytes, visible_watermark: str):
@@ -169,4 +166,4 @@ class StructuralOverlay(WatermarkingMethod):
             else:
                 extracted_data.append(None)  # No watermark found on this page
 
-        return str(extracted_data)
+        return str(extracted_data[0])

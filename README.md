@@ -102,6 +102,8 @@ sudo docker compose -f docker-compose.prod.yml up -d
 2. Login with admin:admin
 3. To view Dashboards, go to Home->Dashboards->Flask Gunicorn Logs & Metrics
 
+
+
 ## Environment Setup
 
 To run or build the project, you need to set up environment variables in a `.env` file at the project root. You can use the provided `.env.sample` as a template:
@@ -115,6 +117,7 @@ Edit `.env` and fill in the required values:
 - `MARIADB_ROOT_PASSWORD`: Root password for MariaDB
 - `MARIADB_USER`: Database user (default: tatou)
 - `MARIADB_PASSWORD`: Database password (default: tatou)
+- `SECRET_KEY`: Flask secret key
 - `GITHUB_TOKEN`: GitHub token for accessing private dependencies during Docker builds (required)
 - `DOCKERHUB_USER`: Prod only, access to container registry
 - `DOCKERHUB_PASSWORD`: Prod only, access to container registry
@@ -125,6 +128,7 @@ Example `.env.sample`:
 MARIADB_ROOT_PASSWORD=your_root_password
 MARIADB_USER=tatou
 MARIADB_PASSWORD=tatou
+SECRET_KEY=flask-key
 GITHUB_TOKEN=your_github_token_here
 
 #For production, required:

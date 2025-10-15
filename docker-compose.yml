@@ -21,6 +21,7 @@ services:
       - DB_PASSWORD=${MARIADB_PASSWORD}
       - PRIVKEY_PASSPHRASE=${PRIVKEY_PASSPHRASE}
       - METRICS_TOKEN=${METRICS_TOKEN}
+      - SECRET_KEY=${SECRET_KEY}
     depends_on:
       db:
         condition: service_healthy
