@@ -10,6 +10,12 @@ from flask import g, request
 import subprocess
 import os
 from time import sleep
+import base64
+import pgpy
+from dotenv import load_dotenv
+
+#Allow configuration to be set from evironment file
+load_dotenv()
 
 #Run environment preparation file
 print("Running prepare_env.bat...")
@@ -33,7 +39,7 @@ def app():
     """Create and configure a new app instance for each test."""
     app = create_app()
     app.config["TESTING"] = True
-    app.config["DB_HOST"] = "127.0.0.1"
+    #app.config["DB_HOST"] = "127.0.0.1"
     return app
 
 
@@ -445,3 +451,117 @@ def test_delete_document_route(client):
     #Test missing file
     resp = client.delete("/api/delete-document/2")
     assert resp_deletion.status_code == 404
+
+#Helpers for RMAP routes test
+def load_public_key(pubkey_path: str) -> pgpy.PGPKey:
+    with open(pubkey_path, 'r') as f:
+        key_data = f.read()
+    key, _ = pgpy.PGPKey.from_blob(key_data)
+    return key
+
+def encrypt_payload(data: dict, pubkey: pgpy.PGPKey) -> str:
+    json_str = json.dumps(data)
+    message = pgpy.PGPMessage.new(json_str)
+    encrypted_message = pubkey.encrypt(message)
+
+    return str(encrypted_message)  # Return ASCII-armored PGP string
+
+def encrypt_payload_for_server(data: dict) -> str:
+    """
+    Encrypts and ASCII-armors the input JSON dictionary, then base64-encodes it.
+    This simulates what the client would send in a real RMAP flow.
+    """
+    # TODO: Implement real PGP encryption using the server’s public key
+    public_key_server_path = str(Path(__file__).parent.parent / "public-keys" / "pki" / "Group_13.asc")
+    public_key = load_public_key(public_key_server_path)
+    armored_pgp = encrypt_payload(data, public_key)
+
+    # Now base64-encode the ASCII-armored text
+    b64_encoded = base64.b64encode(armored_pgp.encode("utf-8")).decode("utf-8")
+    return b64_encoded
+
+
+def decrypt_server_response(payload_b64: str, client_privkey_path: str, passphrase: str = "") -> dict:
+    #Load key
+    client_key, _ = pgpy.PGPKey.from_file(client_privkey_path)
+
+    #Decoding
+    armored = base64.b64decode(payload_b64).decode("utf-8")
+    pgp_msg = pgpy.PGPMessage.from_blob(armored)
+    #Unlock key and decrypt
+    if client_key.is_protected:
+        with client_key.unlock(passphrase):
+            decrypted_msg = client_key.decrypt(pgp_msg)
+    else:
+        decrypted_msg = client_key.decrypt(pgp_msg)
+
+    return json.loads(decrypted_msg.message)
+
+#Testing RMAP routes
+def test_rmap_initiate(client):
+    # Prepare payload
+    test_nonce = 12345678
+    test_identity = "Group_13"
+
+    encrypted_payload = encrypt_payload_for_server({
+        "nonceClient": test_nonce,
+        "identity": test_identity
+    })
+
+    response = client.post("/rmap-initiate", json={"payload": encrypted_payload})
+
+    assert response.status_code == 200
+    json_data = response.get_json()
+    assert "payload" in json_data
+
+    # Optional: decrypt and inspect response payload
+    decrypted = decrypt_server_response(
+        json_data["payload"],
+        client_privkey_path=str(Path(__file__).parent.parent / "client_keys" / "group13-private.asc"),
+        passphrase=os.environ.get("PRIVKEY_PASSPHRASE", "") 
+    )
+    assert decrypted["nonceClient"] == test_nonce
+    assert isinstance(decrypted["nonceServer"], int)
+
+
+def test_rmap_get_link(client):
+    # Step 0: Create RMAP service user to assign document to
+    resp = client.post("/api/create-user", json={
+        "login": "rmap_service",
+        "password": "password_rmap",
+        "email": "service@rmap.su",
+    })  # pragma: allowlist secret
+    # Step 1: Initiate RMAP to get nonceServer
+    test_nonce = 12345678
+    test_identity = "Group_13"
+
+    encrypted_payload = encrypt_payload_for_server({
+        "nonceClient": test_nonce,
+        "identity": test_identity
+    })
+
+    response = client.post("/rmap-initiate", json={"payload": encrypted_payload})
+    assert response.status_code == 200
+    json_data = response.get_json()
+    assert "payload" in json_data
+
+    # Decrypt response to get the actual nonceServer
+    decrypted = decrypt_server_response(
+        json_data["payload"],
+        client_privkey_path=str(Path(__file__).parent.parent / "client_keys" / "group13-private.asc"),
+        passphrase=os.environ.get("PRIVKEY_PASSPHRASE", "")
+    )
+    nonce_server = decrypted["nonceServer"]
+
+    # Step 2: Use that nonceServer in the rmap-get-link call
+    encrypted_payload = encrypt_payload_for_server({
+        "nonceServer": nonce_server
+    })
+
+    response = client.post("/rmap-get-link", json={"payload": encrypted_payload})
+    assert response.status_code == 200
+    json_data = response.get_json()
+
+    assert "result" in json_data
+    assert isinstance(json_data["result"], str)
+    assert len(json_data["result"]) == 32
