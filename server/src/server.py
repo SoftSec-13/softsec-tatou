@@ -31,6 +31,8 @@ from observability import (
     render_prometheus,
 )
 
+MAX_DB_INT = (2**63) - 1
+
 RMAPHandler = None  # default
 if not os.environ.get("TATOU_TEST_DISABLE_RMAP"):
     try:  # Allow tests to disable RMAP dependency via env var
@@ -303,7 +305,7 @@ def create_app():
         start_db = time.time()
         # Validate file size
         MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
-        if file.content_length > MAX_FILE_SIZE:
+        if file.content_length and file.content_length > MAX_FILE_SIZE:
             inc_suspicious("upload_oversize")
             app.logger.warning("Upload attempt with oversized file: %s", file.filename)
             return jsonify({"error": "file too large"}), 413
@@ -451,12 +453,15 @@ def create_app():
             document_id = request.args.get("id") or request.args.get("documentid")
             try:
                 document_id = int(document_id) if document_id else None
-                if document_id is None or document_id <= 0:
+                if document_id is None or document_id <= 0 or document_id > MAX_DB_INT:
                     app.logger.warning("Invalid document id in query")
                     return jsonify({"error": "document id required"}), 400
             except (TypeError, ValueError):
                 app.logger.warning("Invalid document id in query")
                 return jsonify({"error": "document id required"}), 400
+
+        if document_id is None or document_id <= 0 or document_id > MAX_DB_INT:
+            return jsonify({"error": "document id required"}), 400
 
         try:
             with get_engine().connect() as conn:
@@ -568,6 +573,9 @@ def create_app():
             except (TypeError, ValueError):
                 app.logger.warning("Invalid document id in query")
                 return jsonify({"error": "document id required"}), 400
+
+        if document_id is None or document_id <= 0 or document_id > MAX_DB_INT:
+            return jsonify({"error": "document id required"}), 400
 
         try:
             with get_engine().connect() as conn:
@@ -806,7 +814,7 @@ def create_app():
             app.logger.warning("Invalid document id for deletion: %s", document_id)
             return jsonify({"error": "document id required"}), 400
 
-        if doc_id <= 0:
+        if doc_id <= 0 or doc_id > MAX_DB_INT:
             app.logger.warning("Non-positive document id for deletion: %s", doc_id)
             return jsonify({"error": "document id required"}), 400
 
@@ -920,6 +928,8 @@ def create_app():
                 app.logger.warning("Missing document id in request")
                 return jsonify({"error": "document_id (int) is required"}), 400
             doc_id = int(doc_id)
+            if doc_id <= 0 or doc_id > MAX_DB_INT:
+                return jsonify({"error": "document_id (int) is required"}), 400
         except (TypeError, ValueError):
             app.logger.warning("Invalid document id: %s", document_id)
             return jsonify({"error": "document_id (int) is required"}), 400
@@ -1153,6 +1163,8 @@ def create_app():
                 app.logger.warning("Missing document id in request")
                 return jsonify({"error": "document_id (int) is required"}), 400
             doc_id = int(doc_id)
+            if doc_id <= 0 or doc_id > MAX_DB_INT:
+                return jsonify({"error": "document_id (int) is required"}), 400
         except (TypeError, ValueError):
             app.logger.warning("Invalid document id: %s", document_id)
             return jsonify({"error": "document_id (int) is required"}), 400

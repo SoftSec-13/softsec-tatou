@@ -1,0 +1,128 @@
+name: Security Fuzzing
+
+on:
+  push:
+    branches: ['**']  # Run on all branches
+  pull_request:
+    branches: ['**']
+  schedule:
+    - cron: '0 2 * * *'  # Nightly deep fuzzing at 2 AM UTC
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ github.event_name == 'schedule' && '120' || '15' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        fuzzer: [fuzz_api, fuzz_watermarking, fuzz_inputs]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up environment
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "GITHUB_TOKEN=${GITHUB_TOKEN}" >> $GITHUB_ENV
+          mkdir -p server/fuzzing_results_${{ matrix.fuzzer }}
+
+      - name: Build fuzzer image
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: docker compose build fuzzer
+
+      - name: Run fuzzer with corpus
+        env:
+          FUZZ_TIME: ${{ github.event_name == 'schedule' && '3600' || '180' }}
+          MAX_LEN: ${{ github.event_name == 'schedule' && '10000' || '5000' }}
+          FUZZ_WORKERS: "0"  # Auto-detect CPU cores
+          FUZZ_COLLECT_COVERAGE: "1"
+        run: |
+          set +e
+          docker compose run --rm fuzzer bash -c "
+            mkdir -p fuzz/corpus/${{ matrix.fuzzer }}
+            python -m coverage erase
+            timeout \$((${FUZZ_TIME} + 120)) python -m coverage run --parallel-mode fuzz/${{ matrix.fuzzer }}.py \
+              fuzz/corpus/${{ matrix.fuzzer }}/ \
+              -max_total_time=${FUZZ_TIME} \
+              -max_len=${MAX_LEN} \
+              -workers=${FUZZ_WORKERS} \
+              -jobs=${FUZZ_WORKERS} \
+              -artifact_prefix=/tmp/${{ matrix.fuzzer }}_ \
+              -print_final_stats=1 \
+              -timeout=30 \
+              -rss_limit_mb=2048 \
+              2>&1 | tee fuzzing_results_${{ matrix.fuzzer }}/${{ matrix.fuzzer }}.log
+
+            EXIT_CODE=\${PIPESTATUS[0]}
+
+            # Generate coverage
+            python -m coverage combine 2>/dev/null || true
+            python -m coverage xml -o fuzzing_results_${{ matrix.fuzzer }}/coverage.xml 2>/dev/null || true
+            python -m coverage report -m > fuzzing_results_${{ matrix.fuzzer }}/coverage_report.txt 2>/dev/null || true
+
+            # Copy any crash artifacts
+            find /tmp -maxdepth 1 -name '${{ matrix.fuzzer }}_*' -exec cp {} fuzzing_results_${{ matrix.fuzzer }}/ \\; 2>/dev/null || true
+
+            exit \${EXIT_CODE}
+          "
+          echo $? > server/fuzz_status_${{ matrix.fuzzer }}.txt
+
+      - name: Upload coverage
+        if: always()
+        uses: codecov/codecov-action@v3
+        with:
+          files: server/fuzzing_results_${{ matrix.fuzzer }}/coverage.xml
+          flags: fuzzing-${{ matrix.fuzzer }}
+          fail_ci_if_error: false
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzzing-${{ matrix.fuzzer }}
+          path: server/fuzzing_results_${{ matrix.fuzzer }}
+          retention-days: 7
+
+      - name: Check for security findings
+        if: always()
+        run: |
+          cd server
+
+          # Check for crash artifacts
+          CRASHES=$(find fuzzing_results_${{ matrix.fuzzer }}/ -name "*crash-*" -o -name "*timeout-*" -o -name "*oom-*" 2>/dev/null | wc -l)
+
+          # Check for assertion failures (security vulnerabilities)
+          ASSERTIONS=$(grep -c "AssertionError" fuzzing_results_${{ matrix.fuzzer }}/${{ matrix.fuzzer }}.log 2>/dev/null || echo 0)
+
+          # Get fuzzer exit status
+          STATUS=$(cat fuzz_status_${{ matrix.fuzzer }}.txt 2>/dev/null || echo 0)
+
+          echo "### Fuzzing Results for ${{ matrix.fuzzer }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Crashes: ${CRASHES}" >> $GITHUB_STEP_SUMMARY
+          echo "- Security findings (AssertionError): ${ASSERTIONS}" >> $GITHUB_STEP_SUMMARY
+          echo "- Exit status: ${STATUS}" >> $GITHUB_STEP_SUMMARY
+
+          if [[ "${CRASHES}" != "0" ]]; then
+            echo "::error::💥 ${CRASHES} crash artifact(s) detected in ${{ matrix.fuzzer }}"
+            echo "Crash files found. Check uploaded artifacts for details." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+          if [[ "${ASSERTIONS}" != "0" ]]; then
+            echo "::error::🔒 ${ASSERTIONS} security vulnerability(ies) detected in ${{ matrix.fuzzer }}"
+            echo "Security vulnerabilities found! Review logs in artifacts." >> $GITHUB_STEP_SUMMARY
+            # Extract and show first few assertions
+            grep "AssertionError" fuzzing_results_${{ matrix.fuzzer }}/${{ matrix.fuzzer }}.log | head -5 >> $GITHUB_STEP_SUMMARY || true
+            exit 1
+          fi
+
+          if [[ "${STATUS}" != "0" ]]; then
+            echo "::warning::⚠️ Fuzzer ${{ matrix.fuzzer }} exited with status ${STATUS}"
+            echo "Non-zero exit status. Check logs for details." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "::notice::✅ No security issues found in ${{ matrix.fuzzer }}"
+            echo "✅ Clean run - no crashes or vulnerabilities detected." >> $GITHUB_STEP_SUMMARY
+          fi

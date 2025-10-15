@@ -43,13 +43,13 @@ from __future__ import annotations
 
 import os
 from abc import ABC, abstractmethod
-from typing import IO, ClassVar
+from typing import IO, ClassVar, TypeAlias
 
 # ----------------------------
 # Public type aliases & errors
 # ----------------------------
 
-type PdfSource = bytes | str | os.PathLike[str] | IO[bytes]
+PdfSource: TypeAlias = bytes | str | os.PathLike[str] | IO[bytes]
 #: Accepted input type for a PDF document.
 #:
 #: Implementations should *not* assume the input is a file path; always call
