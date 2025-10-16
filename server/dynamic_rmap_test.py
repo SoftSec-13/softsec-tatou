@@ -147,7 +147,7 @@ def test_dynamic_rmap_flow():
         print(f"✓ Created Message 1 with client nonce: {nonce_client}")
 
         response1 = requests.post(
-            f"{SERVER_URL}/rmap-initiate", json=msg1_payload, timeout=10
+            f"{SERVER_URL}/api/rmap-initiate", json=msg1_payload, timeout=10
         )
         if response1.status_code != 200:
             print(f"❌ Message 1 failed: {response1.text}")
@@ -194,7 +194,7 @@ def test_dynamic_rmap_flow():
         print("✓ Created Message 2 with server nonce")
 
         response2 = requests.post(
-            f"{SERVER_URL}/rmap-get-link", json=msg2_payload, timeout=10
+            f"{SERVER_URL}/api/rmap-get-link", json=msg2_payload, timeout=10
         )
         if response2.status_code != 200:
             print(f"❌ Message 2 failed: {response2.text}")

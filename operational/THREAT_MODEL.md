@@ -32,7 +32,7 @@ Scope: Deployed PDF watermarking service (Flask API + MariaDB + watermarking met
 - Security analyst monitoring metrics/logs/Falco alerts (defender)
 
 ## 4. Entry Points / Attack Surface
-- REST endpoints: /api/*, /rmap-initiate, /rmap-get-link
+- REST endpoints: /api/*, /api/rmap-initiate, /api/rmap-get-link
 - Metrics endpoint: /metrics (guarded by X-Metrics-Token header; returns 404 on failure to obscure existence)
 - Health check: /healthz (reveals DB connectivity state)
 - File upload (/api/upload-document) - PDF parsing & watermark embedding
