@@ -11,4 +11,4 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 # Disable optional RMAP dependency during tests to avoid external coupling.
-os.environ.setdefault("TATOU_TEST_DISABLE_RMAP", "1")
+#os.environ.setdefault("TATOU_TEST_DISABLE_RMAP", "1")
