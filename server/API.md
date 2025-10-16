@@ -26,8 +26,8 @@
 - [read-watermark](#read-watermark)
   - **POST** `/api/read-watermark/<int:document_id>`
   - **POST** `/api/read-watermark`
-- [rmap-initiate](#rmap-initiate) — **POST** `/rmap-initiate`
-- [rmap-get-link](#rmap-get-link) — **POST** `/rmap-get-link`
+- [rmap-initiate](#rmap-initiate) — **POST** `/api/rmap-initiate`
+- [rmap-get-link](#rmap-get-link) — **POST** `/api/rmap-get-link`
 - [upload-document](#upload-document) — **POST** `/api/upload-document`
 
 
@@ -411,7 +411,7 @@ The following routes implement the RMAP (Roger Michael Authentication Protocol) 
 ### rmap-initiate
 
 **Path**
-`POST /rmap-initiate`
+`POST /api/rmap-initiate`
 
 **Description**
 Handles RMAP Message 1 for client authentication initiation. The client sends their nonce and identity encrypted to the server's public key.
@@ -464,7 +464,7 @@ On error:
 ### rmap-get-link
 
 **Path**
-`POST /rmap-get-link`
+`POST /api/rmap-get-link`
 
 **Description**
 Handles RMAP Message 2 for final authentication step. The client proves they have the server nonce by sending it back encrypted.

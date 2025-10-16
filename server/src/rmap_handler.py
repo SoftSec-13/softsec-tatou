@@ -57,14 +57,14 @@ class RMAPHandler:
     def _register_routes(self):
         """Register RMAP routes with the Flask app."""
         self.app.add_url_rule(
-            "/rmap-initiate",
+            "/api/rmap-initiate",
             "rmap_initiate",
             self.handle_rmap_initiate,
             methods=["POST"],
         )
 
         self.app.add_url_rule(
-            "/rmap-get-link",
+            "/api/rmap-get-link",
             "rmap_get_link",
             self.handle_rmap_get_link,
             methods=["POST"],
