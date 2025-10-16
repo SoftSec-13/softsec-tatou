@@ -1,0 +1,1 @@
+[{"action": "login", "email": "user6@test.com", "password": "pass"}, {"action": "upload", "intended_for": "recipient6@test.com"}, {"action": "list_documents"}, {"action": "delete_document", "documentid": 6}]

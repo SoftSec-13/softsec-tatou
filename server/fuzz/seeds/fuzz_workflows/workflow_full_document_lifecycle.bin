@@ -1,0 +1,1 @@
+[{"action": "login", "email": "user@test.com", "password": "password123"}, {"action": "upload", "intended_for": "recipient@test.com", "method": "basic"}, {"action": "list_documents"}, {"action": "create_watermark", "documentid": 1, "method": "dct"}, {"action": "read_watermark", "documentid": 1}, {"action": "delete_document", "documentid": 1}]

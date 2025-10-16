@@ -31,6 +31,8 @@ from observability import (
     render_prometheus,
 )
 
+MAX_DB_INT = (2**63) - 1
+
 RMAPHandler = None  # default
 if not os.environ.get("TATOU_TEST_DISABLE_RMAP"):
     try:  # Allow tests to disable RMAP dependency via env var
@@ -70,7 +72,11 @@ def create_app():
     def get_engine():
         eng = app.config.get("_ENGINE")
         if eng is None:
-            eng = create_engine(db_url(), pool_pre_ping=True, future=True)
+            try:
+                eng = create_engine(db_url(), pool_pre_ping=True, future=True)
+            except Exception as e:
+                app.logger.critical("Failed to initialize database engine: %s", e)
+                raise
             app.config["_ENGINE"] = eng
         return eng
 
@@ -79,13 +85,14 @@ def create_app():
         try:
             RMAPHandler(app, str(app.config["STORAGE_DIR"]), get_engine)
         except Exception as e:  # pragma: no cover - defensive; don't fail app
-            app.logger.warning(f"RMAP initialization failed (continuing): {e}")
+            app.logger.warning("RMAP initialization failed (continuing): %s", e)
 
     # --- Helpers ---
     def _serializer():
         return URLSafeTimedSerializer(app.config["SECRET_KEY"], salt="ljkdsad123123kjd")
 
     def _auth_error(msg: str, code: int = 401):
+        app.logger.warning("Auth error (%s): %s", code, msg)
         return jsonify({"error": msg}), code
 
     def require_auth(f):
@@ -137,9 +144,9 @@ def create_app():
                 if cl is not None:
                     observe_request_size(request.method, route, cl)
             except Exception as exc:  # pragma: no cover - soft fail
-                app.logger.error("request size capture failed: %s", exc)
+                app.logger.warning("Request size capture failed: %s", exc)
         except Exception as exc:  # pragma: no cover - defensive
-            app.logger.error("before_request instrumentation failed: %s", exc)
+            app.logger.warning("before_request instrumentation failed: %s", exc)
 
     @app.after_request  # type: ignore
     def _tatou_after(resp):
@@ -150,7 +157,7 @@ def create_app():
                 route = request.url_rule.rule if request.url_rule else request.path
                 record_request(request.method, route, resp.status_code, dur)
         except Exception as exc:  # pragma: no cover - defensive
-            app.logger.error("after_request instrumentation failed: %s", exc)
+            app.logger.warning("after_request instrumentation failed: %s", exc)
         return resp
 
     # --- Routes ---
@@ -195,6 +202,7 @@ def create_app():
         password = payload.get("password") or ""
         start_db = time.time()
         if not email or not login or not password:
+            app.logger.warning("Missing fields in user creation: %s", payload)
             return jsonify({"error": "email, login, and password are required"}), 400
 
         hpw = generate_password_hash(password)
@@ -202,6 +210,7 @@ def create_app():
         try:
             is_valid, error_msg = validate_user_input(email, login)
             if not is_valid:
+                app.logger.warning("User input validation failed: %s", error_msg)
                 return jsonify({"error": error_msg}), 400
 
             with get_engine().begin() as conn:
@@ -219,6 +228,9 @@ def create_app():
                 ).one()
             observe_db_latency("create_user", time.time() - start_db)
         except IntegrityError:
+            app.logger.warning(
+                "Attempt to create duplicate user: email=%s, login=%s", email, login
+            )
             return jsonify({"error": "email or login already exists"}), 409
         except Exception as e:
             app.logger.error("Database error in create_user: %s", e)
@@ -234,6 +246,7 @@ def create_app():
         password = payload.get("password") or ""
 
         if not email or not password:
+            app.logger.warning("Missing fields in login attempt: %s", payload)
             return jsonify({"error": "email and password are required"}), 400
 
         start_db = time.time()
@@ -264,7 +277,7 @@ def create_app():
                     return jsonify({"error": "invalid credentials"}), 401
 
         except Exception as e:
-            app.logger.error(f"Database error in login: {str(e)}")
+            app.logger.error("Database error in login: %s", e)
             inc_db_error("login_select")
             return jsonify({"error": "An error occurred"}), 503
 
@@ -287,29 +300,42 @@ def create_app():
     def upload_document():
         if "file" not in request.files:
             inc_suspicious("upload_missing_file_field")
+            app.logger.warning("Upload attempt missing 'file' field")
             return jsonify({"error": "file is required (multipart/form-data)"}), 400
 
         file = request.files["file"]
         if not file or file.filename == "":
+            app.logger.warning("Upload attempt with empty filename")
             return jsonify({"error": "empty filename"}), 400
 
         start_db = time.time()
         # Validate file size
         MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
-        if file.content_length > MAX_FILE_SIZE:
+        if file.content_length and file.content_length > MAX_FILE_SIZE:
+            inc_suspicious("upload_oversize")
+            app.logger.warning("Upload attempt with oversized file: %s", file.filename)
             return jsonify({"error": "file too large"}), 413
 
         # Validate file type and MIME type
         if file.mimetype != "application/pdf":
             inc_suspicious("upload_bad_mime")
+            app.logger.warning(
+                "Upload attempt with invalid MIME type: %s", file.mimetype
+            )
             return jsonify({"error": "only PDF files are allowed"}), 415
         if not file.filename.lower().endswith(".pdf"):
             inc_suspicious("upload_bad_extension")
+            app.logger.warning(
+                "Upload attempt with invalid file extension: %s", file.filename
+            )
             return jsonify({"error": "only PDF files are allowed"}), 415
 
         # Sanitize filename
         fname = secure_filename(file.filename)
         if not fname:
+            app.logger.warning(
+                "Upload attempt with invalid filename: %s", file.filename
+            )
             return jsonify({"error": "invalid filename"}), 400
 
         user_dir = app.config["STORAGE_DIR"] / "files" / g.user["login"]
@@ -323,11 +349,12 @@ def create_app():
             # Check for path traversal attempts
             stored_path = (user_dir / stored_name).resolve()
             if not str(stored_path).startswith(str(user_dir.resolve())):
+                app.logger.warning("Upload attempt with invalid path: %s", stored_path)
                 return jsonify({"error": "invalid path"}), 400
 
             file.save(stored_path)
         except Exception as e:
-            app.logger.error(f"File save error: {str(e)}")
+            app.logger.error("File save error: %s", e)
             return jsonify({"error": "failed to save file"}), 500
 
         sha_hex = _sha256_file(stored_path)
@@ -361,9 +388,13 @@ def create_app():
                     ),
                     {"id": did},
                 ).one()
-        except Exception as e:
+        except Exception:
             stored_path.unlink(missing_ok=True)
-            app.logger.error(f"Database error: {str(e)}")
+            app.logger.error(
+                "Database error inserting document path=%s user=%s",
+                stored_path,
+                int(g.user["id"]),
+            )
             inc_db_error("insert_document")
             return jsonify({"error": "database error occurred"}), 503
 
@@ -397,8 +428,10 @@ def create_app():
                     ),
                     {"uid": int(g.user["id"])},
                 ).all()
-        except Exception as e:
-            app.logger.error(f"Database error in list_documents: {str(e)}")
+        except Exception:
+            app.logger.error(
+                "Database error in list_documents for user=%s", g.user["id"]
+            )
             inc_db_error("list_documents")
             return jsonify({"error": "An error occurred while fetching documents"}), 503
 
@@ -426,10 +459,15 @@ def create_app():
             document_id = request.args.get("id") or request.args.get("documentid")
             try:
                 document_id = int(document_id) if document_id else None
-                if document_id is None or document_id <= 0:
+                if document_id is None or document_id <= 0 or document_id > MAX_DB_INT:
+                    app.logger.warning("Invalid document id in query")
                     return jsonify({"error": "document id required"}), 400
             except (TypeError, ValueError):
+                app.logger.warning("Invalid document id in query")
                 return jsonify({"error": "document id required"}), 400
+
+        if document_id is None or document_id <= 0 or document_id > MAX_DB_INT:
+            return jsonify({"error": "document id required"}), 400
 
         try:
             with get_engine().connect() as conn:
@@ -445,6 +483,9 @@ def create_app():
                 ).first()
 
                 if not doc:
+                    app.logger.warning(
+                        "Document not found or access denied for id=%s", document_id
+                    )
                     return jsonify({"error": "document not found"}), 404
 
                 # Then fetch versions with ownership validation
@@ -459,8 +500,10 @@ def create_app():
                     """),
                     {"did": document_id, "uid": int(g.user["id"])},
                 ).all()
-        except Exception as e:
-            app.logger.error(f"Database error in list_versions: {str(e)}")
+        except Exception:
+            app.logger.error(
+                f"Database error in list_versions: {document_id},{g.user['id']}"
+            )
             inc_db_error("list_versions")
             return jsonify({"error": "An error occurred while fetching versions"}), 503
 
@@ -484,6 +527,7 @@ def create_app():
         try:
             # Validate user data from auth token
             if not g.user or not g.user.get("id"):
+                app.logger.error("Missing user info in auth token")
                 return jsonify({"error": "Invalid authentication"}), 401
 
             with get_engine().connect() as conn:
@@ -503,8 +547,10 @@ def create_app():
         except ValueError:
             app.logger.error("Invalid user ID in auth token")
             return jsonify({"error": "Authentication error"}), 401
-        except Exception as e:
-            app.logger.error(f"Database error in list_all_versions: {str(e)}")
+        except Exception:
+            app.logger.error(
+                "Database error in list_all_versions for user=%s", g.user["id"]
+            )
             inc_db_error("list_all_versions")
             return jsonify({"error": "An error occurred while fetching versions"}), 503
 
@@ -531,7 +577,11 @@ def create_app():
             try:
                 document_id = int(document_id)
             except (TypeError, ValueError):
+                app.logger.warning("Invalid document id in query")
                 return jsonify({"error": "document id required"}), 400
+
+        if document_id is None or document_id <= 0 or document_id > MAX_DB_INT:
+            return jsonify({"error": "document id required"}), 400
 
         try:
             with get_engine().connect() as conn:
@@ -546,8 +596,10 @@ def create_app():
                     ),
                     {"id": document_id, "uid": int(g.user["id"])},
                 ).first()
-        except Exception as e:
-            app.logger.error(f"Database error in get_document: {str(e)}")
+        except Exception:
+            app.logger.error(
+                f"Database error in get_document: {document_id},{g.user['id']}"
+            )
             inc_db_error("get_document")
             return jsonify(
                 {"error": "An error occurred while fetching the document"}
@@ -555,6 +607,9 @@ def create_app():
 
         # Don’t leak whether a doc exists for another user
         if not row:
+            app.logger.warning(
+                "Document not found or access denied for id=%s", document_id
+            )
             return jsonify({"error": "document not found"}), 404
 
         storage_root = app.config["STORAGE_DIR"].resolve()
@@ -566,15 +621,20 @@ def create_app():
             resolved.relative_to(storage_root)
         except Exception:
             # Path looks suspicious or outside storage
+            app.logger.warning(
+                "Rejected document path for id %s: %s", document_id, row.path
+            )
             return jsonify({"error": "document path invalid"}), 500
 
         if not resolved.exists():
+            app.logger.error("File missing on disk for document id=%s", document_id)
             return jsonify({"error": "file missing on disk"}), 410
 
         # TOCTOU-safe open and validation
         try:
             f = open(resolved, "rb")
         except OSError:
+            app.logger.error("File missing on disk for document id=%s", document_id)
             return jsonify({"error": "file missing on disk"}), 410
 
         try:
@@ -582,6 +642,9 @@ def create_app():
             head = f.read(5)
             if head != b"%PDF-":
                 f.close()
+                app.logger.warning(
+                    "Invalid PDF signature for document id=%s", document_id
+                )
                 return jsonify({"error": "document not available"}), 415
 
             f.seek(0)
@@ -621,7 +684,9 @@ def create_app():
         except Exception as e:
             f.close()
             # Log error and return generic message
-            app.logger.error(f"Error serving file: {str(e)}")
+            app.logger.error(
+                "Error serving file for document id=%s: %s", document_id, e
+            )
             return jsonify({"error": "error serving file"}), 500
 
     # GET /api/get-version/<link>  → returns the watermarked PDF (inline)
@@ -629,6 +694,7 @@ def create_app():
     def get_version(link: str):
         # Accept both 32-char (RMAP session secrets) and 64-char (SHA-256 style) tokens
         if not re.fullmatch(r"[0-9a-f]{32}|[0-9a-f]{64}", link):
+            app.logger.warning("Invalid version link format: %s", link)
             return jsonify({"error": "document not found"}), 404
 
         try:
@@ -650,6 +716,7 @@ def create_app():
             return jsonify({"error": "database error"}), 503
 
         if not row:
+            app.logger.warning("Version not found for link: %s", link)
             return jsonify({"error": "document not found"}), 404
 
         try:
@@ -661,16 +728,21 @@ def create_app():
             return jsonify({"error": "document path invalid"}), 500
 
         if not resolved.exists():
+            app.logger.error("File missing on disk for version link=%s", link)
             return jsonify({"error": "file missing on disk"}), 410
 
         try:
             with resolved.open("rb") as fh:
                 header = fh.read(5)
                 if header != b"%PDF-":
+                    app.logger.warning(
+                        "Invalid PDF signature for version link=%s", link
+                    )
                     return jsonify({"error": "document not available"}), 415
                 fh.seek(0)
                 last_modified = os.fstat(fh.fileno()).st_mtime
         except OSError:
+            app.logger.error("File missing on disk for version link=%s", link)
             return jsonify({"error": "file missing on disk"}), 410
         except Exception as e:
             app.logger.error("Error inspecting version file for %s: %s", link, e)
@@ -739,14 +811,17 @@ def create_app():
             )
 
         if document_id is None:
+            app.logger.warning("Document id required for deletion")
             return jsonify({"error": "document id required"}), 400
 
         try:
             doc_id = int(document_id)
         except (TypeError, ValueError):
+            app.logger.warning("Invalid document id for deletion: %s", document_id)
             return jsonify({"error": "document id required"}), 400
 
-        if doc_id <= 0:
+        if doc_id <= 0 or doc_id > MAX_DB_INT:
+            app.logger.warning("Non-positive document id for deletion: %s", doc_id)
             return jsonify({"error": "document id required"}), 400
 
         owner_id = int(g.user["id"])
@@ -772,6 +847,9 @@ def create_app():
 
         if not row:
             # Don’t reveal others’ docs—just say not found
+            app.logger.warning(
+                "Document not found or access denied for deletion id=%s", doc_id
+            )
             return jsonify({"error": "document not found"}), 404
 
         # Resolve and delete file (best effort)
@@ -839,6 +917,7 @@ def create_app():
         try:
             doc_id = document_id
         except (TypeError, ValueError):
+            app.logger.warning("Invalid document id in query: %s", document_id)
             return jsonify({"error": "document id required"}), 400
 
         payload = request.get_json(silent=True) or {}
@@ -852,9 +931,13 @@ def create_app():
         # validate input
         try:
             if doc_id is None:
+                app.logger.warning("Missing document id in request")
                 return jsonify({"error": "document_id (int) is required"}), 400
             doc_id = int(doc_id)
+            if doc_id <= 0 or doc_id > MAX_DB_INT:
+                return jsonify({"error": "document_id (int) is required"}), 400
         except (TypeError, ValueError):
+            app.logger.warning("Invalid document id: %s", document_id)
             return jsonify({"error": "document_id (int) is required"}), 400
         if (
             not method
@@ -862,6 +945,7 @@ def create_app():
             or not isinstance(secret, str)
             or not isinstance(key, str)
         ):
+            app.logger.warning("Missing required fields for watermarking: %s", payload)
             return jsonify(
                 {"error": "method, intended_for, secret, and key are required"}
             ), 400
@@ -881,10 +965,13 @@ def create_app():
                     {"id": doc_id, "owner": int(g.user["id"])},
                 ).first()
         except Exception as e:
-            app.logger.exception("Database error fetching document %s", e)
+            app.logger.error("Database error fetching document %s", e)
             return jsonify({"error": "database error"}), 503
 
         if not row:
+            app.logger.warning(
+                "Document not found or access denied for watermarking id=%s", doc_id
+            )
             return jsonify({"error": "document not found"}), 404
 
         # resolve path safely under STORAGE_DIR
@@ -896,8 +983,10 @@ def create_app():
         try:
             file_path.relative_to(storage_root)
         except ValueError:
+            app.logger.warning("Rejected document path for id %s: %s", doc_id, row.path)
             return jsonify({"error": "document path invalid"}), 500
         if not file_path.exists():
+            app.logger.error("File missing on disk for document id=%s", doc_id)
             return jsonify({"error": "file missing on disk"}), 410
 
         # check watermark applicability
@@ -907,11 +996,16 @@ def create_app():
             )
             if applicable is False:
                 inc_watermark_failed(method, "applicability")
+                app.logger.info(
+                    "Watermarking method %s not applicable for document %s",
+                    method,
+                    doc_id,
+                )
                 return jsonify({"error": "watermarking method not applicable"}), 400
         except Exception as e:
             inc_watermark_failed(method, "applicability_exception")
-            app.logger.exception(
-                "Watermark applicability check failed for document %s", e
+            app.logger.error(
+                "Watermark applicability check failed for document %s: %s", doc_id, e
             )
             return jsonify({"error": "watermark applicability check failed"}), 400
 
@@ -929,10 +1023,15 @@ def create_app():
             observe_watermark_duration(method, time.time() - _wm_start)
             if not isinstance(wm_bytes, (bytes | bytearray)) or len(wm_bytes) == 0:
                 inc_watermark_failed(method, "empty_output")
+                app.logger.error(
+                    "Watermarking produced no output for document %s using method %s",
+                    doc_id,
+                    method,
+                )
                 return jsonify({"error": "watermarking produced no output"}), 500
         except Exception as e:
             inc_watermark_failed(method, "exception")
-            app.logger.exception(
+            app.logger.error(
                 "Watermarking failed for document %s using method %s: %s",
                 doc_id,
                 method,
@@ -954,7 +1053,7 @@ def create_app():
             with dest_path.open("wb") as f:
                 f.write(wm_bytes)
         except Exception as e:
-            app.logger.exception(
+            app.logger.error(
                 "Failed to write watermarked file %s for document %s: %s",
                 dest_path,
                 doc_id,
@@ -987,6 +1086,19 @@ def create_app():
                     },
                 )
                 vid = int(conn.execute(text("SELECT LAST_INSERT_ID()")).scalar())
+        except IntegrityError as ie:
+            # This should be very rare due to SHA-256 usage, but handle it just in case
+            try:
+                dest_path.unlink(missing_ok=True)
+            except Exception as cleanup_error:
+                app.logger.warning(
+                    f"Failed to cleanup file {dest_path}: {cleanup_error}"
+                )
+            app.logger.error(
+                "Integrity error during version insert for document %s: %s", doc_id, ie
+            )
+            inc_db_error("insert_version")
+            return jsonify({"error": "database error during version insert"}), 503
         except Exception:
             try:
                 dest_path.unlink(missing_ok=True)
@@ -994,7 +1106,7 @@ def create_app():
                 app.logger.warning(
                     f"Failed to cleanup file {dest_path}: {cleanup_error}"
                 )
-            app.logger.exception(
+            app.logger.error(
                 "Database error during version insert for document %s", doc_id
             )
             inc_db_error("insert_version")
@@ -1042,6 +1154,7 @@ def create_app():
         try:
             doc_id = document_id
         except (TypeError, ValueError):
+            app.logger.warning("Invalid document id in query: %s", document_id)
             return jsonify({"error": "document id required"}), 400
 
         payload = request.get_json(silent=True) or {}
@@ -1053,11 +1166,16 @@ def create_app():
         # validate input
         try:
             if doc_id is None:
+                app.logger.warning("Missing document id in request")
                 return jsonify({"error": "document_id (int) is required"}), 400
             doc_id = int(doc_id)
+            if doc_id <= 0 or doc_id > MAX_DB_INT:
+                return jsonify({"error": "document_id (int) is required"}), 400
         except (TypeError, ValueError):
+            app.logger.warning("Invalid document id: %s", document_id)
             return jsonify({"error": "document_id (int) is required"}), 400
         if not method or not isinstance(method, str) or not isinstance(key, str):
+            app.logger.warning("Missing required fields for watermarking: %s", payload)
             return jsonify({"error": "method, and key are required"}), 400
 
         # lookup the document; enforce ownership
@@ -1075,12 +1193,15 @@ def create_app():
                     {"id": doc_id, "owner": int(g.user["id"])},
                 ).first()
         except Exception as e:
-            app.logger.exception(
+            app.logger.error(
                 "Database error fetching document %s for watermark read: %s", doc_id, e
             )
             return jsonify({"error": "database error"}), 503
 
         if not row:
+            app.logger.warning(
+                "Document not found or access denied for watermark read id=%s", doc_id
+            )
             return jsonify({"error": "document not found"}), 404
 
         # resolve path safely under STORAGE_DIR
@@ -1092,15 +1213,17 @@ def create_app():
         try:
             file_path.relative_to(storage_root)
         except ValueError:
+            app.logger.warning("Rejected document path for id %s: %s", doc_id, row.path)
             return jsonify({"error": "document path invalid"}), 500
         if not file_path.exists():
+            app.logger.error("File missing on disk for document id=%s", doc_id)
             return jsonify({"error": "file missing on disk"}), 410
 
         secret = None
         try:
             secret = WMUtils.read_watermark(method=method, pdf=str(file_path), key=key)
         except Exception as e:
-            app.logger.exception(
+            app.logger.error(
                 "Error when attempting to read watermark for document %s: %s", doc_id, e
             )
             return jsonify({"error": "error when attempting to read watermark"}), 400
@@ -1125,6 +1248,9 @@ def create_app():
     def metrics():
         if not _is_authorized_metrics_request():
             # Obscure existence a bit – return 404 instead of 403 to casual scans
+            app.logger.warning(
+                "Unauthorized metrics access attempt from %s", request.remote_addr
+            )
             return jsonify({"error": "not found"}), 404
         data = render_prometheus()
         return Response(data, mimetype="text/plain; version=0.0.4")

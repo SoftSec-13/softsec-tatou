@@ -25,6 +25,12 @@ These rules help an AI agent work productively on this repository. The project i
 - Registry extension: To add a new method, implement subclass of `WatermarkingMethod`, expose `name` and `get_usage()`, then add an instance to `METHODS` in `watermarking_utils.py` (or call `register_method()` early in app startup). Tests automatically parametrize over methods found in `METHODS` (excluding disabled / unsafe ones like `UnsafeBashBridgeAppendEOF`).
 - Determinism: Output bytes should be deterministic for identical inputs (tests expect size >= original and `%PDF-` prefix).
 
+## Observability & Monitoring
+- Built-in metrics: Custom Prometheus-compatible metrics via `observability.py` (no external deps). Counters track uploads, watermarks, errors, DB latency.
+- Metrics endpoint: GET `/metrics` with `X-Metrics-Token` header (configurable via `METRICS_TOKEN` env var).
+- Event tracking: Use `inc_*()` and `observe_*()` functions from observability module; automatically includes route templates and method labels.
+- Monitoring stack: Docker Compose includes Grafana (3000), Loki (3100), Prometheus (9090), Promtail, and Falco for security events.
+
 ## RMAP Flow
 1. Client POST `/rmap-initiate` with base64 PGP payload (nonceClient, identity). Handler may pre‑extract identity to map later.
 2. Server returns encrypted payload containing nonceClient + nonceServer.
@@ -33,10 +39,12 @@ These rules help an AI agent work productively on this repository. The project i
 
 ## Development Workflow
 - Local tests: From `server/`: create venv, `pip install -e ".[dev]"`, run `pytest` (configured via `[tool.pytest.ini_options]` in `pyproject.toml`, tests under `server/test/`).
+- CLI tool: Install provides `pdfwm` command for watermarking operations outside web interface.
 - Linting/security: `ruff` configured (rules E,W,F,I,B,C4,UP,S). Bandit rules partially ignored; do not over‑correct intentionally vulnerable patterns unless asked.
 - Pre-commit: Install with `pre-commit install`; CI runs it on all files before build.
 - Docker (dev): `docker compose up --build -d` after preparing `.env` & server key files. Flask served by Gunicorn on 5000, DB on 3306 (loopback only), Grafana 3000, Loki 3100.
 - Secrets/keys: Ensure `server_priv.asc`, `server_pub.asc` present; `.env` requires `GITHUB_TOKEN` to install the private `rmap` dependency during image build.
+- Environment variables: Key vars include `STORAGE_DIR`, `TOKEN_TTL_SECONDS`, `METRICS_TOKEN`, `PRIVKEY_PASSPHRASE`, `TATOU_TEST_DISABLE_RMAP` (for tests).
 
 ## Adding / Modifying Endpoints
 - Use existing decorators & error style; for authenticated routes wrap with `@require_auth` inside `create_app()` scope so `g.user` is available.
