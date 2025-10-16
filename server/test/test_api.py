@@ -508,7 +508,7 @@ def test_rmap_initiate(client):
     })
 
     # Call route
-    response = client.post("/rmap-initiate", json={"payload": encrypted_payload})
+    response = client.post("/api/rmap-initiate", json={"payload": encrypted_payload})
 
     assert response.status_code == 200
     json_data = response.get_json()
@@ -525,11 +525,11 @@ def test_rmap_initiate(client):
 
     # Test with wrong parameters
     # Missing params
-    response = client.post("/rmap-initiate")
+    response = client.post("/api/rmap-initiate")
     assert response.status_code == 400
 
     # Wrong format params
-    response = client.post("/rmap-initiate", json={"payload":"wrongformatstring"})
+    response = client.post("/api/rmap-initiate", json={"payload":"wrongformatstring"})
     assert response.status_code == 503
 
 
@@ -549,7 +549,7 @@ def test_rmap_get_link(client):
         "identity": test_identity
     })
 
-    response = client.post("/rmap-initiate", json={"payload": encrypted_payload})
+    response = client.post("/api/rmap-initiate", json={"payload": encrypted_payload})
     assert response.status_code == 200
     json_data = response.get_json()
     assert "payload" in json_data
@@ -567,7 +567,7 @@ def test_rmap_get_link(client):
         "nonceServer": nonce_server
     })
 
-    response = client.post("/rmap-get-link", json={"payload": encrypted_payload})
+    response = client.post("/api/rmap-get-link", json={"payload": encrypted_payload})
     assert response.status_code == 200
     json_data = response.get_json()
 
@@ -577,9 +577,9 @@ def test_rmap_get_link(client):
 
     # Test with wrong parameters
     # Missing params
-    response = client.post("/rmap-get-link")
+    response = client.post("/api/rmap-get-link")
     assert response.status_code == 400
 
     # Wrong format params
-    response = client.post("/rmap-get-link", json={"payload":"wrongformatstring"})
+    response = client.post("/api/rmap-get-link", json={"payload":"wrongformatstring"})
     assert response.status_code == 503
