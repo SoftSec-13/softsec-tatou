@@ -1,5 +1,15 @@
-# Ignore pdfs
+# Project-specific ignores
+.mcp.json
+.serena/
+sifu/
+
+# AI agent configuration files
+CLAUDE.md
+AGENTS.md
+
+# Ignore pdfs (except seed corpus)
 *.pdf
+!server/fuzz/corpus/**/*.pdf
 
 # Ignore debug files
 .vscode/
@@ -7,6 +17,7 @@
 # Ignore keys
 server/src/server_pub.asc
 server/src/server_priv.asc
+server/src/server_pub_external.asc
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -61,6 +72,12 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 cover/
+server/crash-*/
+server/oom-*/
+server/timeout-*/
+server/fuzzing_results_*/
+server/fuzz_status*.txt
+server/parse_status*.txt
 
 # Translations
 *.mo
@@ -110,27 +127,6 @@ ipython_config.py
 #   This is especially recommended for binary packages to ensure reproducibility, and is more
 #   commonly ignored for libraries.
 #uv.lock
-
-# poetry
-#   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
-#   This is especially recommended for binary packages to ensure reproducibility, and is more
-#   commonly ignored for libraries.
-#   https://python-poetry.org/docs/basic-usage/#commit-your-poetrylock-file-to-version-control
-#poetry.lock
-#poetry.toml
-
-# pdm
-#   Similar to Pipfile.lock, it is generally recommended to include pdm.lock in version control.
-#   pdm recommends including project-wide configuration in pdm.toml, but excluding .pdm-python.
-#   https://pdm-project.org/en/latest/usage/project/#working-with-version-control
-#pdm.lock
-#pdm.toml
-.pdm-python
-.pdm-build/
-
-# pixi
-#   Similar to Pipfile.lock, it is generally recommended to include pixi.lock in version control.
-#pixi.lock
 #   Pixi creates a virtual environment in the .pixi directory, just like venv module creates one
 #   in the .venv directory. It is recommended not to include this directory in version control.
 .pixi
