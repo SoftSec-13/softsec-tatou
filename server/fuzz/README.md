@@ -11,7 +11,7 @@ White-box security testing to discover:
 
 **Key Features:**
 - ✅ Python coverage tracking enabled (`enable_python_coverage=True`)
-- ✅ Structure-aware mutations via dictionaries (198-281 tokens per fuzzer)
+- ✅ Structure-aware mutations via dictionaries (comprehensive token sets per fuzzer)
 - ✅ Advanced attack pattern detection (JWT, XXE, NoSQL, SSTI, prototype pollution)
 - ✅ Stateful fuzzing for multi-step workflows and IDOR
 - ✅ Enhanced PDF generation (6 strategies: valid, malicious, nested, memory exhaustion)
@@ -22,10 +22,10 @@ White-box security testing to discover:
 
 | Fuzzer | Target | Focus | Seeds |
 |--------|--------|-------|-------|
-| **targets/fuzz_rest_endpoints.py** | REST API endpoints | Auth, IDOR, input validation, SQL injection, XSS, path traversal | 100 |
-| **targets/fuzz_pdf_explore.py** | PDF parsing | explore_pdf() function, structure validation, malformed PDFs | 20 |
-| **targets/fuzz_pdf_apply.py** | PDF watermarking | apply_watermark(), structural mutations, edge cases | 20 |
-| **targets/fuzz_pdf_read.py** | Watermark extraction | read_watermark(), method-specific attacks, crypto validation | 20 |
+| **targets/fuzz_rest_endpoints.py** | REST API endpoints | Auth, IDOR, input validation, SQL injection, XSS, path traversal | 107 |
+| **targets/fuzz_pdf_explore.py** | PDF parsing | explore_pdf() function, structure validation, malformed PDFs | 101 |
+| **targets/fuzz_pdf_apply.py** | PDF watermarking | apply_watermark(), structural mutations, edge cases | 101 |
+| **targets/fuzz_pdf_read.py** | Watermark extraction | read_watermark(), method-specific attacks, crypto validation | 101 |
 | **targets/fuzz_workflows.py** | Multi-step workflows | IDOR, session management, state transitions | 60 |
 
 ### Key Components
@@ -60,7 +60,7 @@ fuzz/
 │   ├── fuzz_pdf_apply/           # Watermarking seeds
 │   ├── fuzz_pdf_read/            # Watermark reading seeds
 │   └── fuzz_workflows/           # Multi-step workflow seeds
-├── corpus/                        # Runtime discoveries (gitignored)
+├── fuzz/corpus/                   # Runtime discoveries (gitignored)
 └── scripts/
     └── run_fuzzing_suite.sh       # Orchestrates all 5 fuzzers
 ```
@@ -190,28 +190,28 @@ docker compose run --rm fuzzer python fuzz/targets/fuzz_pdf_explore.py \
     fuzz/corpus/fuzz_pdf_explore/ \
     fuzz/seeds/fuzz_pdf_explore/ \
     -max_total_time=300 \
-    -max_len=5000
+    -max_len=50000
 
 # PDF watermarking fuzzer
 docker compose run --rm fuzzer python fuzz/targets/fuzz_pdf_apply.py \
     fuzz/corpus/fuzz_pdf_apply/ \
     fuzz/seeds/fuzz_pdf_apply/ \
     -max_total_time=300 \
-    -max_len=5000
+    -max_len=100000
 
 # Watermark reading fuzzer
 docker compose run --rm fuzzer python fuzz/targets/fuzz_pdf_read.py \
     fuzz/corpus/fuzz_pdf_read/ \
     fuzz/seeds/fuzz_pdf_read/ \
     -max_total_time=300 \
-    -max_len=5000
+    -max_len=50000
 
 # Multi-step workflow fuzzer
 docker compose run --rm fuzzer python fuzz/targets/fuzz_workflows.py \
     fuzz/corpus/fuzz_workflows/ \
     fuzz/seeds/fuzz_workflows/ \
     -max_total_time=300 \
-    -max_len=1000
+    -max_len=100000
 
 ```
 
@@ -255,7 +255,7 @@ docker compose run --rm fuzzer python fuzz/targets/fuzz_rest_endpoints.py \
     -merge=1 \
     fuzz/corpus/fuzz_rest_endpoints_merged/ \
     fuzz/corpus/fuzz_rest_endpoints/ \
-    fuzzing_results_*/corpus/
+    fuzzing_results_*/fuzz/corpus/
 
 # This removes duplicate/redundant inputs, keeping only unique coverage
 ```
@@ -410,6 +410,7 @@ def test_crash_abc123_fixed():
 - [Fuzzing Book](https://www.fuzzingbook.org/)
 - [OWASP Testing Guide](https://owasp.org/www-project-web-security-testing-guide/)
 - [Google's OSS-Fuzz](https://github.com/google/oss-fuzz)
+- [Fixed Security Bugs](FIXED_BUGS.md) - Vulnerabilities discovered through fuzzing
 
 ## License
 
