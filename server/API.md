@@ -18,7 +18,7 @@
 - [get-watermarking_methods](#get-watermarking-methods) — **GET** `/api/get-watermarking-methods`
 - [healthz](#healthz) — **GET** `/healthz`
 - [list-all-versions](#list-all-versions) — **GET** `/api/list-all-versions`
-- [list-pdf](#list-pdf) — **GET** `/api/list-documents`
+- [list-documents](#list-documents) — **GET** `/api/list-documents`
 - [list-versions](#list-versions)
   - **GET** `/api/list-versions/<int:document_id>`
   - **GET** `/api/list-versions`
@@ -44,13 +44,30 @@ This endpoint checks the health of the server and confirms it is running.
 _None_
 
 **Return**
+
+On success:
+
 ```json
 {
   "message": <string>
 }
 ```
 
+On error:
+
+```json
+{
+    "error": "<error-message>"
+}
+```
+
+**Status Codes**
+
+- `200`: Success
+- `503`: Service unavailable
+
 **Specification**
+
  * The healthz endpoint MUST be accessible without authentication.
  * The response MUST always contain a "message" field of type string.
 
@@ -72,6 +89,9 @@ This endpoint creates a new user account in the system.
 ```
 
 **Return**
+
+On success:
+
 ```json
 {
   "id": <int>,
@@ -80,10 +100,26 @@ This endpoint creates a new user account in the system.
 }
 ```
 
+On error:
+
+```json
+{
+    "error": "<error-message>"
+}
+```
+
+**Status Codes**
+
+- `201`: Success
+- `400`: Invalid payload
+- `409`: User or email already exist
+- `503`: Database error
 
 **Specification**
+
  * The create-user endpoint MUST validate that username, password, and email are provided.
  * The response MUST include a unique id along with the created username and email.
+ * The login and email in the response MUST match those in the request.
 
 
 ## login
@@ -103,6 +139,9 @@ This endpoint authenticates a user with their credentials and returns a session 
 ```
 
 **Return**
+
+On success:
+
 ```json
 {
   "token": <string>,
@@ -111,7 +150,23 @@ This endpoint authenticates a user with their credentials and returns a session 
 }
 ```
 
+On error:
+
+```json
+{
+    "error": "<error-message>"
+}
+```
+
+**Status Codes**
+
+- `200`: Success
+- `400`: Invalid payload
+- `401`: Invalid credentials
+- `503`: Database error
+
 **Specification**
+
  * The login endpoint MUST reject requests missing email or password.
  * The response MUST include a token string and its expiration date as an integer Time To Live in seconds.
 
@@ -132,9 +187,12 @@ This endpoint uploads a PDF document to the server and registers its metadata.
 ```
 
 **Return**
+
+On success:
+
 ```json
 {
-  "id": <string>,
+  "id": <int>,
   "name": <string>,
   "creation": <date ISO 8601>,
   "sha256": <string>,
@@ -142,7 +200,26 @@ This endpoint uploads a PDF document to the server and registers its metadata.
 }
 ```
 
+On error:
+
+```json
+{
+    "error": "<error-message>"
+}
+```
+
+**Status Codes**
+
+- `201`: Success
+- `400`: Invalid payload
+- `401`: Authentication error
+- `413`: File exceeds maximum size
+- `415`: File is not a PDF
+- `500`: Error saving file
+- `503`: Database error
+
 **Specification**
+
  * Requires authentication
  * The upload-pdf endpoint MUST accept only files in PDF format.
 
@@ -158,11 +235,14 @@ This endpoint lists all uploaded PDF documents along with their metadata.
 _None_
 
 **Return**
+
+On success:
+
 ```json
 {
   "documents": [
     {
-      "id": <string>,
+      "id": <int>,
       "name": <string>,
       "creation": <date ISO 8601>,
       "sha256": <string>,
@@ -172,7 +252,14 @@ _None_
 }
 ```
 
+**Status Codes**
+
+- `200`: Success
+- `401`: Authentication error
+- `503`: Database error
+
 **Specification**
+
  * Requires authentication
  * The response MUST return all documents of the user.
 
@@ -198,6 +285,9 @@ This endpoint lists all watermarked versions of a given PDF document along with 
 _None_
 
 **Return**
+
+On success:
+
 ```json
 {
   "versions": [
@@ -213,7 +303,21 @@ _None_
 }
 ```
 
+On error:
 
+```json
+{
+    "error": "<error-message>"
+}
+```
+
+**Status Codes**
+
+- `200`: Success
+- `400`: Invalid payload
+- `401`: Authentication error
+- `404`: File not found
+- `503`: Database error
 
 **Specification**
  * Requires authentication
@@ -222,7 +326,7 @@ _None_
  ## list-all-versions
 
 **Path**
-`GET /api/list-versions`
+`GET /api/list-all-versions`
 
 **Description**
 This endpoint lists all versions of all PDF documents for the authenticated user stored in the system.
@@ -231,6 +335,9 @@ This endpoint lists all versions of all PDF documents for the authenticated user
 _None_
 
 **Return**
+
+On success:
+
 ```json
 {
   "versions": [
@@ -246,7 +353,22 @@ _None_
 }
 ```
 
+On error:
+
+```json
+{
+    "error": "<error-message>"
+}
+```
+
+**Status Codes**
+
+- `200`: Success
+- `401`: Authentication error
+- `503`: Database error
+
 **Specification**
+
  * Requires authentication
 
  ## get-document
@@ -261,18 +383,74 @@ This endpoint retrieves a PDF document by fetching a specific one when an `id` i
 **Parameters**
 ```json
 {
-  "id": <int>
+  "documentid": <int>
 }
 ```
 
 **Path**
 `GET /api/get-document/<int:document_id>`
 
+**Parameters**
+_None_
+
 **Return**
-Inline PDF file in binary format.
+On success: Inline PDF file in binary format.
+
+On error:
+
+```json
+{
+    "error": "<error-message>"
+}
+```
+
+**Status Codes**
+
+- `400`: Invalid payload
+- `401`: Authentication error
+- `404`: Document not found
+- `410`: File missing on disk
+- `415`: File not available (invalid PDF signature)
+- `500`: Document path invalid / Error serving file
 
 **Specification**
+
  * Requires authentication
+
+ ## get-version
+
+**Description**
+This endpoint retrieves a specific watermarked version of a document when a `link` is provided.
+
+**Path**
+`GET /api/get-version/<str:link>`
+
+**Parameters**
+_None_
+
+**Return**
+On success: Inline PDF file in binary format.
+
+On error:
+
+```json
+{
+    "error": "<error-message>"
+}
+```
+
+**Status Codes**
+
+- `400`: Invalid payload
+- `404`: Document not found
+- `410`: File missing on disk
+- `415`: File not available (invalid PDF signature)
+- `500`: Document path invalid / Error serving file
+- `503`: Database error
+
+**Specification**
+
+ * The endpoint MUST be reachable without authentication
 
   ## get-watermarking-methods
 
@@ -282,12 +460,13 @@ This endpoint lists all available watermarking methods.
 **Path**
 `GET /api/get-watermarking-methods`
 
-
 **Parameters**
 _None_
 
-
 **Return**
+
+On success:
+
 ```json
 {
     "count": <int>,
@@ -300,7 +479,12 @@ _None_
 }
 ```
 
+**Status Codes**
+
+- `200`: Success
+
 **Specification**
+
  * The endpoint MUST return all methods in `watermarking_utils.METHODS`.
 
    ## read-watermark
@@ -334,8 +518,10 @@ This endpoint reads information contain in a pdf document's watermark with the p
 }
 ```
 
-
 **Return**
+
+On success:
+
 ```json
 {
     "documentid": <int>,
@@ -345,7 +531,26 @@ This endpoint reads information contain in a pdf document's watermark with the p
 }
 ```
 
+On error:
+
+```json
+{
+    "error": "<error-message>"
+}
+```
+
+**Status Codes**
+
+- `201`: Success
+- `400`: Invalid payload / Error reading watermark
+- `401`: Authentication error
+- `404`: Document not found
+- `410`: File missing on disk
+- `500`: Document path invalid
+- `503`: Database error
+
 **Specification**
+
  * The endpoint MUST return the secret read in the document.
 
 
@@ -358,6 +563,7 @@ This endpoint reads information contain in a pdf document's watermark with the p
 `POST /api/create-watermark`
 
 **Parameters**
+
 ```json
 {
     "method": <string>,
@@ -372,8 +578,8 @@ This endpoint reads information contain in a pdf document's watermark with the p
 **Path**
 `POST /api/create-watermark<int:document_id>`
 
-
 **Parameters**
+
 ```json
 {
     "method": <string>,
@@ -384,8 +590,10 @@ This endpoint reads information contain in a pdf document's watermark with the p
 }
 ```
 
-
 **Return**
+
+On success:
+
 ```json
 {
     "id": <int>,
@@ -399,8 +607,76 @@ This endpoint reads information contain in a pdf document's watermark with the p
 }
 ```
 
+On error:
+
+```json
+{
+    "error": "<error-message>"
+}
+```
+
+**Status Codes**
+
+- `201`: Success
+- `400`: Invalid payload / Watermarking method not applicable
+- `401`: Authentication error
+- `404`: Document not found
+- `410`: File missing on disk
+- `500`: Document path invalid / Watermarking failed
+- `503`: Database error
+
 **Specification**
+
  * Only the owner of a document should be able to create watermarks for their documents.
+
+
+
+ ## delete-document
+
+**Description**
+This endpoint deletes a PDF document  when an `id` is provided.
+
+**Path**
+`DELETE, POST /api/delete-document`
+
+
+**Parameters**
+
+```json
+{
+  "id": <int>
+}
+```
+
+**Path**
+`DELETE /api/delete-document/<int:document_id>`
+
+**Parameters**
+_None_
+
+**Return**
+On success: *None*
+
+On error:
+
+```json
+{
+    "error": "<error-message>"
+}
+```
+
+**Status Codes**
+
+- `200`: Success
+- `400`: Invalid payload
+- `401`: Authentication error
+- `404`: Document not found
+- `503`: Database error
+
+**Specification**
+
+ * Requires authentication
+ * Only the owner of the document should be able to delete it
 
 ---
 
@@ -455,6 +731,7 @@ On error:
 ```
 
 **Status Codes**
+
 - `200`: Success
 - `400`: Invalid payload or unknown identity
 - `503`: RMAP system initialization failed

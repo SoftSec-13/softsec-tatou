@@ -1,0 +1,23 @@
+[cosmic-ray]
+modules = ["observability",
+           "rmap_handler",
+           "robust_xmp_watermark",
+           "server",
+           "signed_annotation_watermark",
+           "simple_rmap",
+           "structural_and_overlay_watermark",
+           "watermarking_method",
+           "watermarking_utils"]            
+module-path = "."  
+# Error in test command, supposed to call the whole test suite
+# Use results as preliminary, revise test suite and run again     
+test-command = "pytest ../test/test_api.py"
+baseline = 80
+timeout = 60
+
+[cosmic-ray.distributor]
+name = "local"
+
+[cosmic-ray.runner]
+runner = "local"
+timeout = 60
