@@ -1,0 +1,1040 @@
+{
+  "uid": "tatou-security",
+  "title": "Tatou Security & Operations Dashboard",
+  "tags": ["tatou", "security", "stride", "threat-model", "observability"],
+  "timezone": "browser",
+  "schemaVersion": 37,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": ["10s", "30s", "1m", "5m", "15m", "30m", "1h"]
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "🎯 STRIDE Overview - Real-time Threat Indicators",
+      "gridPos": {"x": 0, "y": 0, "w": 24, "h": 1},
+      "id": 1,
+      "collapsed": false
+    },
+    {
+      "type": "stat",
+      "title": "🔐 Failed Logins (5m)",
+      "description": "STRIDE: Spoofing - Brute force detection. Alert threshold: >50",
+      "targets": [
+        {
+          "expr": "sum(increase(tatou_login_failures_total[5m]))",
+          "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+          "legendFormat": "Failed Logins"
+        }
+      ],
+      "gridPos": {"x": 0, "y": 1, "w": 4, "h": 4},
+      "id": 2,
+      "options": {
+        "graphMode": "area",
+        "colorMode": "background"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": 0, "color": "green"},
+              {"value": 20, "color": "yellow"},
+              {"value": 50, "color": "red"}
+            ]
+          },
+          "unit": "short"
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "⚠️ Suspicious Events (5m)",
+      "description": "STRIDE: Multiple - Probing attempts, bad MIME types, missing fields",
+      "targets": [
+        {
+          "expr": "sum(increase(tatou_suspicious_events_total[5m]))",
+          "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"}
+        }
+      ],
+      "gridPos": {"x": 4, "y": 1, "w": 4, "h": 4},
+      "id": 3,
+      "options": {
+        "graphMode": "area",
+        "colorMode": "background"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": 0, "color": "green"},
+              {"value": 10, "color": "yellow"},
+              {"value": 20, "color": "red"}
+            ]
+          },
+          "unit": "short"
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "💥 DB Errors (5m)",
+      "description": "STRIDE: Elevation of Privilege - Potential SQL injection attempts",
+      "targets": [
+        {
+          "expr": "sum(increase(tatou_db_errors_total[5m]))",
+          "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"}
+        }
+      ],
+      "gridPos": {"x": 8, "y": 1, "w": 4, "h": 4},
+      "id": 4,
+      "options": {
+        "graphMode": "area",
+        "colorMode": "background"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": 0, "color": "green"},
+              {"value": 3, "color": "yellow"},
+              {"value": 5, "color": "red"}
+            ]
+          },
+          "unit": "short"
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "🚨 Falco Critical Alerts",
+      "description": "STRIDE: Elevation of Privilege - Container breakout, shell spawning",
+      "targets": [
+          {
+            "datasource": {
+              "type": "loki",
+              "uid": "P982945308D3682D1"
+            },
+            "expr": "sum by(id) (count_over_time({service_name=\"/falco\"} |~ `(?i)(critical|error)` [$__auto]))",
+            "refId": "A",
+            "editorMode": "builder",
+            "queryType": "range",
+            "direction": "backward"
+          }
+        ],
+      "gridPos": {"x": 12, "y": 1, "w": 4, "h": 4},
+      "id": 5,
+      "options": {
+        "graphMode": "area",
+        "colorMode": "background",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "sum"
+          ],
+          "fields": ""
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": 0, "color": "green"},
+              {"value": 1, "color": "red"}
+            ]
+          },
+          "unit": "short"
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "📊 API Error Rate (%)",
+      "description": "STRIDE: Denial of Service - 5xx error percentage",
+      "targets": [
+        {
+          "expr": "100 * sum(rate(tatou_http_requests_total{status=~\"5..\"}[5m])) / sum(rate(tatou_http_requests_total[5m]))",
+          "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"}
+        }
+      ],
+      "gridPos": {"x": 16, "y": 1, "w": 4, "h": 4},
+      "id": 6,
+      "options": {
+        "graphMode": "area",
+        "colorMode": "background"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": 0, "color": "green"},
+              {"value": 1, "color": "yellow"},
+              {"value": 5, "color": "red"}
+            ]
+          },
+          "unit": "percent",
+          "decimals": 2
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "⏱️ API p95 Latency",
+      "description": "STRIDE: Denial of Service - Performance degradation indicator",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(tatou_http_request_duration_seconds_bucket[5m])) by (le))",
+          "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"}
+        }
+      ],
+      "gridPos": {"x": 20, "y": 1, "w": 4, "h": 4},
+      "id": 7,
+      "options": {
+        "graphMode": "area",
+        "colorMode": "background"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": 0, "color": "green"},
+              {"value": 0.25, "color": "yellow"},
+              {"value": 0.5, "color": "red"}
+            ]
+          },
+          "unit": "s",
+          "decimals": 3
+        }
+      }
+    },
+    {
+      "type": "row",
+      "title": "🌐 HTTP Traffic & Performance (Denial of Service Detection)",
+      "gridPos": {"x": 0, "y": 5, "w": 24, "h": 1},
+      "id": 10,
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "Request Rate by Method & Route",
+      "description": "Total requests per second grouped by HTTP method and route template",
+      "targets": [
+        {
+          "expr": "sum(rate(tatou_http_requests_total[1m])) by (method, route)",
+          "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+          "legendFormat": "{{method}} {{route}}"
+        }
+      ],
+      "gridPos": {"x": 0, "y": 6, "w": 12, "h": 7},
+      "id": 11,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10,
+            "stacking": {"mode": "normal"}
+          },
+          "unit": "reqps"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP Status Code Distribution",
+      "description": "Request volume by status code (2xx, 4xx, 5xx)",
+      "targets": [
+        {
+          "expr": "sum(rate(tatou_http_requests_total{status=~\"2..\"}[1m]))",
+          "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+          "legendFormat": "2xx Success"
+        },
+        {
+          "expr": "sum(rate(tatou_http_requests_total{status=~\"4..\"}[1m]))",
+          "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+          "legendFormat": "4xx Client Error"
+        },
+        {
+          "expr": "sum(rate(tatou_http_requests_total{status=~\"5..\"}[1m]))",
+          "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+          "legendFormat": "5xx Server Error"
+        }
+      ],
+      "gridPos": {"x": 12, "y": 6, "w": 12, "h": 7},
+      "id": 12,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 20
+          },
+          "unit": "reqps"
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "5xx Server Error"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "4xx Client Error"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "yellow"}}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "2xx Success"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}]
+          }
+        ]
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "API Latency Percentiles (p50, p95, p99)",
+      "description": "Request duration percentiles - detect performance degradation",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(tatou_http_request_duration_seconds_bucket[5m])) by (le))",
+          "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+          "legendFormat": "p50 (median)"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(tatou_http_request_duration_seconds_bucket[5m])) by (le))",
+          "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(tatou_http_request_duration_seconds_bucket[5m])) by (le))",
+          "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+          "legendFormat": "p99"
+        }
+      ],
+      "gridPos": {"x": 0, "y": 13, "w": 12, "h": 7},
+      "id": 13,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth"
+          },
+          "unit": "s"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "In-Flight Requests",
+      "description": "Concurrent requests being processed - detect saturation",
+      "targets": [
+        {
+          "expr": "sum(tatou_http_requests_in_progress_total) by (route)",
+          "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+          "legendFormat": "{{route}}"
+        }
+      ],
+      "gridPos": {"x": 12, "y": 13, "w": 12, "h": 7},
+      "id": 14,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 20
+          },
+          "unit": "short"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Request Body Size Distribution",
+      "description": "Upload size patterns - detect DoS via large payloads",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(tatou_http_request_body_bytes_bucket[5m])) by (le, method))",
+          "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+          "legendFormat": "{{method}} p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(tatou_http_request_body_bytes_bucket[5m])) by (le, method))",
+          "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+          "legendFormat": "{{method}} p95"
+        }
+      ],
+      "gridPos": {"x": 0, "y": 20, "w": 12, "h": 7},
+      "id": 15,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth"
+          },
+          "unit": "decbytes"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Upload Volume Trend",
+      "description": "Total bytes uploaded - detect storage flood attacks",
+      "targets": [
+        {
+          "expr": "sum(rate(tatou_upload_bytes_total[10m]))",
+          "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+          "legendFormat": "Upload Rate (bytes/sec)"
+        },
+        {
+          "expr": "sum(rate(tatou_upload_bytes_total[10m] offset 10m))",
+          "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+          "legendFormat": "Prior 10m Baseline"
+        }
+      ],
+      "gridPos": {"x": 12, "y": 20, "w": 12, "h": 7},
+      "id": 16,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10
+          },
+          "unit": "Bps"
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "Prior 10m Baseline"},
+            "properties": [
+              {"id": "custom.lineStyle", "value": {"dash": [10, 10], "fill": "dash"}},
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "blue"}}
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "row",
+      "title": "🔐 Authentication & Authorization (Spoofing Detection)",
+      "gridPos": {"x": 0, "y": 27, "w": 24, "h": 1},
+      "id": 20,
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "Login Attempts: Success vs Failure",
+      "description": "Track authentication patterns - detect brute force attacks",
+      "targets": [
+        {
+          "expr": "sum(rate(tatou_login_successes_total[1m]))",
+          "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+          "legendFormat": "✅ Successful Logins"
+        },
+        {
+          "expr": "sum(rate(tatou_login_failures_total[1m]))",
+          "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+          "legendFormat": "❌ Failed Logins"
+        }
+      ],
+      "gridPos": {"x": 0, "y": 28, "w": 12, "h": 7},
+      "id": 21,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 20
+          },
+          "unit": "reqps"
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "❌ Failed Logins"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "✅ Successful Logins"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}]
+          }
+        ]
+      }
+    },
+    {
+      "type": "piechart",
+      "title": "Login Failure Reasons",
+      "description": "Breakdown of why logins fail",
+      "targets": [
+        {
+          "expr": "sum(increase(tatou_login_failures_total[1h])) by (reason)",
+          "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+          "legendFormat": "{{reason}}"
+        }
+      ],
+      "gridPos": {"x": 12, "y": 28, "w": 12, "h": 7},
+      "id": 22,
+      "options": {
+        "displayLabels": ["name", "percent"],
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "values": ["value", "percent"]
+        }
+      }
+    },
+    {
+      "type": "table",
+      "title": "Top Failed Login Attempts by Client IP",
+      "description": "Identify potential attackers by IP address",
+      "targets": [
+        {
+          "expr": "{container=~\".*server.*\", method=\"POST\", path=~\".*/login.*\", status=~\"401|403\"} | line_format \"{{.client_ip}}\"",
+          "datasource": {"type": "loki", "uid": "P982945308D3682D1"}
+        }
+      ],
+      "transformations": [
+        {
+          "id": "groupBy",
+          "options": {
+            "fields": {
+              "Line": {
+                "aggregations": [
+                  "count"
+                ],
+                "operation": "groupby"
+              },
+              "id": {
+                "aggregations": [
+                  "count"
+                ],
+                "operation": "aggregate"
+              }
+            }
+          }
+        }
+      ],
+      "gridPos": {"x": 0, "y": 35, "w": 24, "h": 6},
+      "id": 23,
+      "options": {
+        "sortBy": [{"displayName": "Line (count)", "desc": true}]
+      }
+    },
+    {
+      "type": "row",
+      "title": "📄 Watermarking Operations (Tampering & DoS Detection)",
+      "gridPos": {"x": 0, "y": 41, "w": 24, "h": 1},
+      "id": 30,
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "Watermark Lifecycle: Created vs Read",
+      "description": "Track watermark creation and reads - detect enumeration attacks",
+      "targets": [
+        {
+          "expr": "sum(rate(tatou_watermarks_created_total[1m])) by (method)",
+          "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+          "legendFormat": "Created: {{method}}"
+        },
+        {
+          "expr": "sum(rate(tatou_watermarks_read_total[1m])) by (method)",
+          "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+          "legendFormat": "Read: {{method}}"
+        }
+      ],
+      "gridPos": {"x": 0, "y": 42, "w": 12, "h": 7},
+      "id": 31,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10
+          },
+          "unit": "ops"
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Watermark Read/Create Ratio",
+      "description": "Ratio >10 over 30m may indicate enumeration. Alert threshold defined in threat model",
+      "targets": [
+        {
+          "expr": "sum(rate(tatou_watermarks_read_total[30m])) / sum(rate(tatou_watermarks_created_total[30m]))",
+          "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"}
+        }
+      ],
+      "gridPos": {"x": 12, "y": 42, "w": 6, "h": 7},
+      "id": 32,
+      "options": {
+        "graphMode": "area",
+        "colorMode": "background"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": 0, "color": "green"},
+              {"value": 5, "color": "yellow"},
+              {"value": 10, "color": "red"}
+            ]
+          },
+          "unit": "short",
+          "decimals": 2
+        }
+      }
+    },
+    {
+      "type": "gauge",
+      "title": "Watermark Failure Rate",
+      "description": "Failures >5% indicate fuzzing or exploits. Alert threshold in threat model",
+      "targets": [
+        {
+          "expr": "100 * sum(rate(tatou_watermarks_failed_total[15m])) / (sum(rate(tatou_watermarks_created_total[15m])) + sum(rate(tatou_watermarks_failed_total[15m])))",
+          "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"}
+        }
+      ],
+      "gridPos": {"x": 18, "y": 42, "w": 6, "h": 7},
+      "id": 33,
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": 0, "color": "green"},
+              {"value": 2, "color": "yellow"},
+              {"value": 5, "color": "red"}
+            ]
+          },
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Watermark Operation Duration by Method",
+      "description": "Processing time percentiles - detect malicious PDFs causing heavy processing",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(tatou_watermark_duration_seconds_bucket[5m])) by (le, method))",
+          "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+          "legendFormat": "{{method}} p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(tatou_watermark_duration_seconds_bucket[5m])) by (le, method))",
+          "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+          "legendFormat": "{{method}} p99"
+        }
+      ],
+      "gridPos": {"x": 0, "y": 49, "w": 12, "h": 7},
+      "id": 34,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth"
+          },
+          "unit": "s"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Watermark Failures by Method & Stage",
+      "description": "Track where watermarking fails - identify exploitation attempts",
+      "targets": [
+        {
+          "expr": "sum(rate(tatou_watermarks_failed_total[1m])) by (method, stage)",
+          "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+          "legendFormat": "{{method}}: {{stage}}"
+        }
+      ],
+      "gridPos": {"x": 12, "y": 49, "w": 12, "h": 7},
+      "id": 35,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80
+          },
+          "unit": "ops"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Upload Activity",
+      "description": "Number of PDFs uploaded over time",
+      "targets": [
+        {
+          "expr": "sum(rate(tatou_uploads_total[1m]))",
+          "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+          "legendFormat": "Uploads per minute"
+        }
+      ],
+      "gridPos": {"x": 0, "y": 56, "w": 24, "h": 6},
+      "id": 36,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 20
+          },
+          "unit": "rpm"
+        }
+      }
+    },
+    {
+      "type": "row",
+      "title": "🗄️ Database Operations (Elevation of Privilege Detection)",
+      "gridPos": {"x": 0, "y": 62, "w": 24, "h": 1},
+      "id": 40,
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "Database Query Latency by Operation",
+      "description": "DB performance metrics - slow queries may indicate SQLi attempts",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(tatou_db_query_duration_seconds_bucket[5m])) by (le, operation))",
+          "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+          "legendFormat": "{{operation}} p95"
+        }
+      ],
+      "gridPos": {"x": 0, "y": 63, "w": 12, "h": 7},
+      "id": 41,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth"
+          },
+          "unit": "s"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Database Errors by Operation",
+      "description": "DB error spike may indicate SQL injection attempts",
+      "targets": [
+        {
+          "expr": "sum(rate(tatou_db_errors_total[1m])) by (operation)",
+          "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+          "legendFormat": "{{operation}}"
+        }
+      ],
+      "gridPos": {"x": 12, "y": 63, "w": 12, "h": 7},
+      "id": 42,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80
+          },
+          "unit": "ops",
+          "color": {"mode": "palette-classic"}
+        }
+      }
+    },
+    {
+      "type": "logs",
+      "title": "Database Error Logs",
+      "description": "Recent database errors for investigation",
+      "targets": [
+        {
+          "expr": "{service_name=~\"/softsec-tatou-db-1\"} |~ \"(?i)(Warning|Error|Exception|Fail)\"",
+          "datasource": {"type": "loki", "uid": "P982945308D3682D1"}
+        }
+      ],
+      "gridPos": {"x": 0, "y": 70, "w": 24, "h": 6},
+      "id": 43,
+      "options": {
+        "dedupStrategy": "none",
+        "showLabels": false,
+        "wrapLogMessage": true
+      }
+    },
+    {
+      "type": "row",
+      "title": "🚨 Security Events (Information Disclosure & Suspicious Activity)",
+      "gridPos": {"x": 0, "y": 76, "w": 24, "h": 1},
+      "id": 50,
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "Suspicious Events by Reason",
+      "description": "Early warning indicators: bad MIME, missing fields, oversized uploads, etc.",
+      "targets": [
+        {
+          "expr": "sum(rate(tatou_suspicious_events_total[1m])) by (reason)",
+          "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+          "legendFormat": "{{reason}}"
+        }
+      ],
+      "gridPos": {"x": 0, "y": 77, "w": 12, "h": 7},
+      "id": 51,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80
+          },
+          "unit": "ops"
+        }
+      }
+    },
+    {
+      "type": "table",
+      "title": "Recent Suspicious Events",
+      "description": "Detailed view of suspicious validation failures",
+      "targets": [
+        {
+          "expr": "sum(increase(tatou_suspicious_events_total[1h])) by (reason)",
+          "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+          "legendFormat": "{{reason}}",
+          "format": "table"
+        }
+      ],
+      "gridPos": {"x": 12, "y": 77, "w": 12, "h": 7},
+      "id": 52,
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "reason": "Reason",
+              "Value": "Count (1h)"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "404 Rate on Protected Endpoints",
+      "description": "Information Disclosure: Secret guessing attacks on version links",
+      "targets": [
+        {
+          "expr": "sum(rate(tatou_http_requests_total{status=\"404\", route=~\".*version.*\"}[1m]))",
+          "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+          "legendFormat": "Version endpoint 404s"
+        },
+        {
+          "expr": "sum(rate(tatou_http_requests_total{status=\"404\"}[1m]))",
+          "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+          "legendFormat": "All 404s"
+        }
+      ],
+      "gridPos": {"x": 0, "y": 84, "w": 24, "h": 7},
+      "id": 53,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10
+          },
+          "unit": "reqps"
+        }
+      }
+    },
+    {
+      "type": "row",
+      "title": "🛡️ Runtime Security (Falco Events)",
+      "gridPos": {"x": 0, "y": 91, "w": 24, "h": 1},
+      "id": 60,
+      "collapsed": false
+    },
+    {
+      "type": "logs",
+      "title": "Recent Falco Alerts",
+      "description": "Runtime security events from Falco - container breakout, shell spawning, etc.",
+      "targets": [
+        {
+          "expr": "{falco_rule!=\"\"}",
+          "datasource": {"type": "loki", "uid": "P982945308D3682D1"}
+        }
+      ],
+      "gridPos": {"x": 0, "y": 92, "w": 24, "h": 8},
+      "id": 61,
+      "options": {
+        "dedupStrategy": "none",
+        "showLabels": true,
+        "wrapLogMessage": true,
+        "showTime": true,
+        "sortOrder": "Descending"
+      }
+    },
+    {
+      "type": "table",
+      "title": "Falco Events by Priority",
+      "description": "Breakdown of Falco alerts by severity level",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{service_name=\"/falco\"}",
+          "queryType": "range",
+          "datasource": {
+            "type": "loki",
+            "uid": "P982945308D3682D1"
+          },
+          "editorMode": "code",
+          "direction": "backward"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "extractFields",
+          "options": {
+            "delimiter": ",",
+            "source": "labels",
+            "format": "json"
+          }
+        },
+        {
+          "id": "groupBy",
+          "options": {
+            "fields": {
+              "detected_level": {
+                "aggregations": [],
+                "operation": "groupby"
+              },
+              "falco_rule": {
+                "aggregations": [],
+                "operation": null
+              },
+              "falco_evt_type": {
+                "aggregations": [],
+                "operation": null
+              },
+              "id": {
+                "aggregations": [
+                  "count"
+                ],
+                "operation": "aggregate"
+              }
+            }
+          }
+        }
+      ],
+      "gridPos": {"x": 0, "y": 100, "w": 12, "h": 6},
+      "id": 62
+    },
+    {
+      "type": "table",
+      "title": "Falco Events by Rule",
+      "description": "Most frequently triggered security rules",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{service_name=\"/falco\"}",
+          "queryType": "range",
+          "datasource": {
+            "type": "loki",
+            "uid": "P982945308D3682D1"
+          },
+          "editorMode": "code",
+          "direction": "backward"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "extractFields",
+          "options": {
+            "delimiter": ",",
+            "source": "labels",
+            "format": "json"
+          }
+        },
+        {
+          "id": "groupBy",
+          "options": {
+            "fields": {
+              "falco_rule": {
+                "aggregations": [],
+                "operation": "groupby"
+              },
+              "detected_level": {
+                "aggregations": [],
+                "operation": null
+              },
+              "falco_evt_type": {
+                "aggregations": [],
+                "operation": null
+              },
+              "id": {
+                "aggregations": [
+                  "count"
+                ],
+                "operation": "aggregate"
+              }
+            }
+          }
+        }
+      ],
+      "gridPos": {"x": 12, "y": 100, "w": 12, "h": 6},
+      "id": 63
+    },
+    {
+      "type": "row",
+      "title": "📊 Application Logs",
+      "gridPos": {"x": 0, "y": 106, "w": 24, "h": 1},
+      "id": 70,
+      "collapsed": false
+    },
+    {
+      "type": "logs",
+      "title": "HTTP Access Logs",
+      "description": "Parsed Gunicorn access logs with method, path, status, and client IP",
+      "targets": [
+        {
+          "expr": "{container=~\".*server.*\", method=~\"GET|POST|PUT|DELETE\"}",
+          "datasource": {"type": "loki", "uid": "P982945308D3682D1"}
+        }
+      ],
+      "gridPos": {"x": 0, "y": 107, "w": 24, "h": 8},
+      "id": 71,
+      "options": {
+        "dedupStrategy": "none",
+        "showLabels": true,
+        "wrapLogMessage": false,
+        "showTime": true,
+        "sortOrder": "Descending"
+      }
+    },
+    {
+      "type": "logs",
+      "title": "Application Error Logs",
+      "description": "Server errors, exceptions, and warnings",
+      "targets": [
+        {
+          "expr": "{container=~\".*server.*\"} |~ \"(?i)(error|exception|warning|critical)\"",
+          "datasource": {"type": "loki", "uid": "P982945308D3682D1"}
+        }
+      ],
+      "gridPos": {"x": 0, "y": 115, "w": 24, "h": 8},
+      "id": 72,
+      "options": {
+        "dedupStrategy": "none",
+        "showLabels": true,
+        "wrapLogMessage": true,
+        "showTime": true,
+        "sortOrder": "Descending"
+      }
+    }
+  ]
+}
