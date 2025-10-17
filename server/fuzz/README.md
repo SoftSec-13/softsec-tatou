@@ -410,8 +410,5 @@ def test_crash_abc123_fixed():
 - [Fuzzing Book](https://www.fuzzingbook.org/)
 - [OWASP Testing Guide](https://owasp.org/www-project-web-security-testing-guide/)
 - [Google's OSS-Fuzz](https://github.com/google/oss-fuzz)
-- [Fixed Security Bugs](FIXED_BUGS.md) - Vulnerabilities discovered through fuzzing
-
-## License
-
-Part of the Tatou project - for educational use only.
+- [Fixed Security Bugs](FIXED_BUGS.md) - Vulnerabilities discovered through fuzzing and fixed
+- [Discovered Security Bugs](DISCOVERED_BUGS.md) - **UNFIXED** vulnerabilities requiring immediate attention
