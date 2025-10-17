@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 #Run environment preparation file
-print("Running prepare_env.bat...")
+print("Preparing the environment...")
 script_dir = Path(__file__).parent
 env_script = script_dir / "prepare_env.bat"
 result = subprocess.run(str(env_script.resolve()), shell=True)
