@@ -5,7 +5,7 @@ This document explains the structure and operation of Tatou's test suite, compos
 
 ### Structure of the test suite
 
-The test suite is written using the pytest framework and is composed of 41 tests spread across different files. It designed to set up the environment automatically, load and execute all necessary files. All test files are contained in the server/test folder.
+The test suite is written using the pytest framework and is composed of 42 tests spread across different files. It designed to set up the environment automatically, load and execute all necessary files. All test files are contained in the server/test folder.
 
 The `test_api.py` script performs integration testing for Tatou and requires a database connection. This is done automatically by a configuration script called upon load. The `test_watermarking_all_methods.py` and `test_watermarking_utilities.py` files contain unit tests for the watermarking functions and can be ran without setting up the database.
 

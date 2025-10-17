@@ -104,6 +104,15 @@ def test_create_user_route(client):
     )
     assert resp.status_code == 400
 
+    # Malformed email
+    resp = client.post("/api/create-user",json={
+                "email": "malformedemail",
+                "login": "username",
+                "password": "password",
+            },  # pragma: allowlist secret
+    )
+    assert resp.status_code == 400
+
 
 def test_login_route(client):
     """Test login endpoint."""
@@ -136,6 +145,9 @@ def test_login_route(client):
     # Both missing
     resp = client.post("/api/login", json={})
     assert resp.status_code == 400
+    # Malformed email - counts as non existing
+    resp = client.post("/api/login", json={"email": "malformedemail", "password": "password"})
+    assert resp.status_code == 401
 
 def test_upload_document_route(client):
     """Test document upload endpoint."""
