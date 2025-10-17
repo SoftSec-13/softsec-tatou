@@ -446,8 +446,8 @@ def test_delete_document_route(client):
     assert resp_deletion.status_code == 404
 
     #Test missing id
-    resp = client.delete("/api/delete-document/")
-    assert resp_deletion.status_code == 404
+    resp = client.delete("/api/delete-document")
+    assert resp.status_code == 400
     #Test missing file
     resp = client.delete("/api/delete-document/2")
     assert resp_deletion.status_code == 404
