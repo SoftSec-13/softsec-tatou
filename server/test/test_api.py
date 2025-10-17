@@ -48,6 +48,10 @@ def client(app):
     """A test client for the app."""
     return app.test_client()
 
+# Global variable for document link to test get-version
+@pytest.fixture(scope="module")
+def shared_link():
+    return {}
 
 def test_healthz_route(client):
     """Test the health check endpoint."""
@@ -55,7 +59,6 @@ def test_healthz_route(client):
 
     assert resp.status_code == 200  # nosec B101
     assert resp.is_json  # nosec B101
-
 
 def test_create_user_route(client):
     """Test user creation endpoint."""
@@ -434,7 +437,6 @@ def test_read_watermark_route(client):
                                                     "id": 2})
     assert resp.status_code == 400
 
-
 def test_delete_document_route(client):
     document_id = {"id": 2}
     resp = client.delete("/api/delete-document", json=document_id)
@@ -533,7 +535,7 @@ def test_rmap_initiate(client):
     assert response.status_code == 503
 
 
-def test_rmap_get_link(client):
+def test_rmap_get_link(client, shared_link):
     # Step 0: Create RMAP service user to assign document to
     resp = client.post("/api/create-user", json={
         "login": "rmap_service",
@@ -574,6 +576,7 @@ def test_rmap_get_link(client):
     assert "result" in json_data
     assert isinstance(json_data["result"], str)
     assert len(json_data["result"]) == 32
+    shared_link["version_link"] = json_data.get("result")
 
     # Test with wrong parameters
     # Missing params
@@ -583,3 +586,25 @@ def test_rmap_get_link(client):
     # Wrong format params
     response = client.post("/api/rmap-get-link", json={"payload":"wrongformatstring"})
     assert response.status_code == 503
+
+# Retrieve the watermarked document using the link
+def test_get_version_route(client, shared_link):
+    route = "/api/get-version/" + shared_link.get("version_link").strip()
+    resp = client.get(route)
+
+    # Check Content-Type
+    is_pdf = resp.headers.get('Content-Type') == 'application/pdf'
+    # Check Content-Disposition for 'inline'
+    content_disposition = resp.headers.get('Content-Disposition', '')
+    is_inline = 'inline' in content_disposition.lower()
+    #Oracle
+    assert is_pdf
+    assert is_inline
+
+    # Test with malformed request
+    resp = client.get("/api/get-version/123malformedlink")
+    assert resp.status_code == 404
+
+    # Test with missing link
+    resp = client.get("/api/get-version")
+    assert resp.status_code == 404
