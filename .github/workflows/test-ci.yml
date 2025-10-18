@@ -1,4 +1,4 @@
-name: Build & Test CI Pipeline
+name: Regression Testing CI Pipeline
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   regression-testing:
-    name: Build & Test
+    name: Regression Testing
     runs-on: ubuntu-latest
 
     services:
@@ -61,7 +61,7 @@ jobs:
           DB_PASSWORD: tatou # pragma: allowlist secret
           TOKEN_TTL_SECONDS: 3600
         run: |
-            pytest test_fuzzing_regression.py test_watermarking_all_methods.py test_watermarking_utilities.py
+            pytest test_fuzzing_regression.py
 
       - name: Upload pytest artifacts (on failure)
         if: failure()
