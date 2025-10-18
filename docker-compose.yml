@@ -55,7 +55,9 @@ services:
       - PYTHONUNBUFFERED=1
     volumes:
       - ./server:/app
-    command: ["python", "-m", "pytest", "test/test_fuzzing_regression.py", "-v", "--tb=short"]
+    command: ["python", "-m", "pytest", 
+              "test/test_fuzzing_regression.py test/test_watermarking_all_methods.py 
+              test/test_watermarking_utilities.py", "-v", "--tb=short"]
 
   db:
     image: mariadb:latest
