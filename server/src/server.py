@@ -55,7 +55,7 @@ def create_app():
 
     app.config["DB_USER"] = os.environ.get("DB_USER", "tatou")
     app.config["DB_PASSWORD"] = os.environ.get("DB_PASSWORD", "tatou")
-    app.config["DB_HOST"] = os.environ.get("DB_HOST", "db") 
+    app.config["DB_HOST"] = os.environ.get("DB_HOST", "db")
     app.config["DB_PORT"] = int(os.environ.get("DB_PORT", "3306"))
     app.config["DB_NAME"] = os.environ.get("DB_NAME", "tatou")
 
@@ -98,7 +98,7 @@ def create_app():
     def require_auth(f):
         @wraps(f)
         def wrapper(*args, **kwargs):
-            if app.config['TESTING']:
+            if app.config["TESTING"]:
                 g.user = {"id": 1, "login": "username", "email": "user@email.se"}
                 return f(*args, **kwargs)
             auth = request.headers.get("Authorization", "")
@@ -122,7 +122,7 @@ def create_app():
 
         return wrapper
 
-    app.require_auth = require_auth #Needed to mock authentication in testing
+    app.require_auth = require_auth  # Needed to mock authentication in testing
 
     def _sha256_file(path: Path) -> str:
         h = hashlib.sha256()

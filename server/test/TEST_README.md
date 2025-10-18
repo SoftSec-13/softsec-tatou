@@ -9,7 +9,7 @@ The test suite is written using the pytest framework and is composed of 42 tests
 
 The `test_api.py` script performs integration testing for Tatou and requires a database connection. This is done automatically by a configuration script called upon load. The `test_watermarking_all_methods.py` and `test_watermarking_utilities.py` files contain unit tests for the watermarking functions and can be ran without setting up the database.
 
-The `unittest_structural_overlay_watermark.py` file is a manual test used during development to test the specific watermarking method and is not part of the pytest test suite, however it is helpful to run before the other tests (see below). 
+The `unittest_structural_overlay_watermark.py` file is a manual test used during development to test the specific watermarking method and is not part of the pytest test suite, however it is helpful to run before the other tests (see below).
 
 The `test_fuzzing_regression.py` file implements 10 additional tests related to specific bugs discovered during fuzzing and was not developed as part of the original testing suite. It will, however, be run when pytest is called on the whole test suite. See the `tatou/server/fuzz` folder for complete documentation.
 
@@ -35,6 +35,12 @@ You may also want to change the duration of the sleep function, depending on you
 
 The test suite also requires a file named `input.pdf` under `test/storage/files/username`, and a file named `watermarked.pdf` in the same location, watermarked with the Structural and Overlay method. To achieve this, place a PDF file of your choice in the folder (it should not be bigger than 50 Mb), then run `unittest_structural_overlay_watermark.py` once to create the watermarked version (make sure you have installed the necessary dependencies, see below).
 
+Testing the RMAP routes requires a public PGP key and a private PGP key. You will need to place a public key named `Group_13.asc` under `tatou/server/public-keys/pki` and a corresponding private key named `server_priv.asc` under `tatou/server/src`. Then add the private key's password to your `.env` file as follows:
+
+```.env
+PRIVKEY_PASSPHRASE=yourpassword
+```
+
 When you are all set, run the following:
 
 ```bash
@@ -55,10 +61,9 @@ python -m pytest /test
 # Run a specific test file
 python -m pytest /test/<filename>.py
 
-# See verbose output and output of print functions 
+# See verbose output and output of print functions
 python -m pytest -s -vv /test
 
 # Perform coverage testing (you may need to install the cov plugin for pytest)
 python -m pytest --cov=src /test
 ```
-

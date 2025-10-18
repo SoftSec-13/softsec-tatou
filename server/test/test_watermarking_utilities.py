@@ -38,10 +38,10 @@ class TestWatermarkingUtils:
         assert len(WMUtils.METHODS) > 0
 
         # Check for expected methods from the imports (using actual names)
-        
-        #Default unsafe methods have been removed
-        #assert "toy-eof" in WMUtils.METHODS
-        #assert "bash-bridge-eof" in WMUtils.METHODS
+
+        # Default unsafe methods have been removed
+        # assert "toy-eof" in WMUtils.METHODS
+        # assert "bash-bridge-eof" in WMUtils.METHODS
         assert "robust-xmp" in WMUtils.METHODS
         assert "overlay-watermark" in WMUtils.METHODS
         assert "signed-annots" in WMUtils.METHODS
@@ -124,8 +124,8 @@ class TestWatermarkingUtils:
             result = WMUtils.apply_watermark(
                 method=method_name,
                 pdf=sample_pdf_path,
-                secret="test-secret",  # pragma: allowlist secret
-                key="test-key",
+                secret="test-secret",  # nosec B106
+                key="test-key",  # nosec B106
             )
 
             assert isinstance(result, bytes | bytearray)
@@ -140,8 +140,8 @@ class TestWatermarkingUtils:
             result = WMUtils.apply_watermark(
                 method=method,
                 pdf=sample_pdf_path,
-                secret="test-secret",  # pragma: allowlist secret
-                key="test-key",  # pragma: allowlist secret
+                secret="test-secret",  # nosec B106
+                key="test-key",  # nosec B106
             )
 
             assert isinstance(result, bytes | bytearray)

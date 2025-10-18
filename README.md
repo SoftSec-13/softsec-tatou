@@ -35,7 +35,7 @@ python -m pytest /test
 # Run a specific test file
 python -m pytest /test/<filename>.py
 
-# See verbose output and output of print functions 
+# See verbose output and output of print functions
 python -m pytest -s -vv /test
 
 # Perform coverage testing (you may need to install the cov plugin for pytest)

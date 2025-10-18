@@ -1,11 +1,12 @@
 from collections import defaultdict
 from pathlib import Path
 
+
 def analyze_mutation_results(file_path):
     total_counts = defaultdict(int)
     survived_counts = defaultdict(int)
 
-    with open(file_path, 'r', encoding='utf-16') as f:
+    with open(file_path, encoding="utf-16") as f:
         # Remove empty lines
         lines = [line.strip() for line in f if line.strip()]
 
@@ -13,13 +14,12 @@ def analyze_mutation_results(file_path):
         if i + 2 >= len(lines):
             continue  # skip incomplete block
 
-        line_jobid = lines[i]          # ignore
-        line_module = lines[i + 1]     # contains module name
-        line_outcome = lines[i + 2]    # contains outcome
+        line_module = lines[i + 1]  # contains module name
+        line_outcome = lines[i + 2]  # contains outcome
 
         # Skip last line with overall results
         module_name = line_module.split()[0]
-        if 'complete' in module_name:
+        if "complete" in module_name:
             continue
 
         # Extract outcome
@@ -49,7 +49,7 @@ def analyze_mutation_results(file_path):
         f"{'Proportion':>{survived_col_width}}"
     )
     print(header)
-    print("-" * (module_col_width + total_col_width + survived_col_width*2))
+    print("-" * (module_col_width + total_col_width + survived_col_width * 2))
 
     for module in sorted(total_counts):
         total = total_counts[module]
@@ -62,6 +62,7 @@ def analyze_mutation_results(file_path):
             f"{survived:>{survived_col_width}}"
             f"{truncated:>{survived_col_width}}"
         )
+
 
 if __name__ == "__main__":
     path_to_file = Path(__file__).parent.parent / "src" / "Mutation_Results.txt"
