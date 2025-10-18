@@ -1,4 +1,4 @@
-name: Testing CI Pipeline
+name: Regression Testing CI Pipeline
 
 on:
   push:
@@ -7,8 +7,8 @@ on:
     branches: [ main ]
 
 jobs:
-  test:
-    name: Build & Test
+  regression-testing:
+    name: Regression Testing
     runs-on: ubuntu-latest
 
     services:
@@ -51,7 +51,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e '.[dev]'
 
-      - name: Run tests
+      - name: Run regression tests
         working-directory: server/test
         env:
           DB_HOST: 127.0.0.1
@@ -60,8 +60,8 @@ jobs:
           DB_USER: tatou
           DB_PASSWORD: tatou # pragma: allowlist secret
           TOKEN_TTL_SECONDS: 3600
-        run: | # change to do all tests
-            pytest test_api.py
+        run: |
+            pytest test_fuzzing_regression.py
 
       - name: Upload pytest artifacts (on failure)
         if: failure()

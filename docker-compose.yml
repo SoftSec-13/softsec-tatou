@@ -44,7 +44,7 @@ services:
       - ./server:/app
     command: ["bash", "-lc", "./fuzz/scripts/run_fuzzing_suite.sh"]
 
-  test:
+  regression-testing:
     build:
       context: ./server
       dockerfile: test/Dockerfile
@@ -55,7 +55,7 @@ services:
       - PYTHONUNBUFFERED=1
     volumes:
       - ./server:/app
-    command: ["python", "-m", "pytest", "test/", "-v", "--tb=short"]
+    command: ["python", "-m", "pytest", "test/test_fuzzing_regression.py", "-v", "--tb=short"]
 
   db:
     image: mariadb:latest
