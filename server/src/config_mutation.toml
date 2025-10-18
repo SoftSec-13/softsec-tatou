@@ -8,9 +8,7 @@ modules = ["observability",
            "structural_and_overlay_watermark",
            "watermarking_method",
            "watermarking_utils"]            
-module-path = "."  
-# Error in test command, supposed to call the whole test suite
-# Use results as preliminary, revise test suite and run again     
+module-path = "."      
 test-command = "pytest ../test/test_api.py ../test/test_watermarking_all_methods.py ../test/test_watermarking_utilities.py"
 baseline = 80
 timeout = 60
