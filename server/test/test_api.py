@@ -22,7 +22,7 @@ load_dotenv()
 # Run environment preparation file
 print("Preparing the environment...")
 script_dir = Path(__file__).parent
-env_script = script_dir / "prepare_env.sh"
+env_script = script_dir / "prepare_env.bat"
 result = subprocess.run(  # noqa: S603 # nosec prepping environ
     [str(env_script.resolve())]
 )
