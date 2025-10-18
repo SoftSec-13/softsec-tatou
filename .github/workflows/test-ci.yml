@@ -60,8 +60,9 @@ jobs:
           DB_USER: tatou
           DB_PASSWORD: tatou # pragma: allowlist secret
           TOKEN_TTL_SECONDS: 3600
+          TEST_PASSPHRASE: testingtatou # pragma: allowlist secret
         run: | # change to do all tests
-            pytest test_api.py
+            pytest test_api.py test_watermarking_all_methods.py test_watermarking_utils.py
 
       - name: Upload pytest artifacts (on failure)
         if: failure()
