@@ -18,8 +18,12 @@ def save_pdf(path: str, data: bytes):
 
 def main():
     script_dir = Path(__file__).parent
-    input_pdf_path = script_dir / "storage" / "files" / "username" / "input.pdf"  # ✅ PDF path
-    output_pdf_path = script_dir / "storage" / "files" / "username" / "watermarked.pdf"  # ✅ Output file path
+    input_pdf_path = (
+        script_dir / "storage" / "files" / "username" / "input.pdf"
+    )  # ✅ PDF path
+    output_pdf_path = (
+        script_dir / "storage" / "files" / "username" / "watermarked.pdf"
+    )  # ✅ Output file path
     hidden_val = "hidden-example-value"  # nosec
     key = "strong-password"
 

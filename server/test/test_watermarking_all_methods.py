@@ -46,9 +46,11 @@ def secret() -> str:
 def key() -> str:
     return "unit-test-key"
 
+
 @pytest.fixture(scope="session")
 def intended_for() -> str:
     return "unit-test-recipient"
+
 
 def _as_instance(impl: WatermarkingMethod) -> WatermarkingMethod:
     """Return an instance for class objects; pass instances through."""
