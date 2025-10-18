@@ -17,19 +17,19 @@ To see how the tests are mapped to the API's specification, see `API_TEST_SPECIF
 
 ### Configure and run the test suite
 
-Tatou's test suite needs a preparation shell script to be run before the tests are executed. This is done automatically by the test suite. Depending on your OS, you may need to select a different script. Open the `test_api.py` module and navigate to this section (lines 20-26):
+Tatou's test suite needs a preparation shell script to be run before the tests are executed. This is done automatically by the test suite. Unit and integration tests were developed on a Windows machine, thus the default configuration file is the `prepare_env.bat` script. If you are running Linux, open the `test_api.py` file and navigate to this section (lines 20-26):
 
 ```python
 #Run environment preparation file
 print("Preparing the environment...")
 script_dir = Path(__file__).parent
-env_script = script_dir / "prepare_env.sh"
+env_script = script_dir / "prepare_env.bat"
 result = subprocess.run(str(env_script.resolve()), shell=True)
 print("Waiting for db to be ready...")
 sleep(10)
 ```
 
-Choose between `"prepare_env.bat"` and`"prepare_env.sh"` depending on whether you are running Windows or Linux. Both files are already included in the project. The test suite was developed on a Windows machine.
+Replace `"prepare_env.bat"` with `"prepare_env.sh"`. The shell file is already included in the project.
 
 You may also want to change the duration of the sleep function, depending on your machine's processing speed.
 
