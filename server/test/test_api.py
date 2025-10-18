@@ -22,7 +22,7 @@ load_dotenv()
 # Run environment preparation file
 print("Preparing the environment...")
 script_dir = Path(__file__).parent
-env_script = script_dir / "prepare_env.bat"
+env_script = script_dir / "prepare_env.sh"
 result = subprocess.run(  # noqa: S603 # nosec prepping environ
     [str(env_script.resolve())]
 )
@@ -661,7 +661,7 @@ def decrypt_server_response(
 def test_rmap_initiate(client):
     # Prepare payload
     test_nonce = 12345678
-    test_identity = "Group_13"
+    test_identity = "Test_Identity"
 
     encrypted_payload = encrypt_payload_for_server(
         {"nonceClient": test_nonce, "identity": test_identity}
@@ -677,10 +677,8 @@ def test_rmap_initiate(client):
     # Decrypt and inspect response payload
     decrypted = decrypt_server_response(
         json_data["payload"],
-        client_privkey_path=str(
-            Path(__file__).parent.parent / "src" / "server_priv.asc"
-        ),
-        passphrase=os.environ.get("PRIVKEY_PASSPHRASE", ""),
+        client_privkey_path=str(Path(__file__).parent / "mock_test_keys" / "pv.asc"),
+        passphrase=os.environ.get("TEST_PASSPHRASE", ""),
     )
     assert decrypted["nonceClient"] == test_nonce
     assert isinstance(decrypted["nonceServer"], int)
@@ -708,7 +706,7 @@ def test_rmap_get_link(client, shared_link):
     assert resp.status_code == 201
     # Step 1: Initiate RMAP to get nonceServer
     test_nonce = 12345678
-    test_identity = "Group_13"
+    test_identity = "Test_Identity"
 
     encrypted_payload = encrypt_payload_for_server(
         {"nonceClient": test_nonce, "identity": test_identity}
@@ -722,10 +720,8 @@ def test_rmap_get_link(client, shared_link):
     # Decrypt response to get the actual nonceServer
     decrypted = decrypt_server_response(
         json_data["payload"],
-        client_privkey_path=str(
-            Path(__file__).parent.parent / "src" / "server_priv.asc"
-        ),
-        passphrase=os.environ.get("PRIVKEY_PASSPHRASE", ""),
+        client_privkey_path=str(Path(__file__).parent / "mock_test_keys" / "pv.asc"),
+        passphrase=os.environ.get("TEST_PASSPHRASE", ""),
     )
     nonce_server = decrypted["nonceServer"]
 

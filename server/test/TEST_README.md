@@ -17,28 +17,29 @@ To see how the tests are mapped to the API's specification, see `API_TEST_SPECIF
 
 ### Configure and run the test suite
 
-Unit and integration tests were developed on a Windows machine, thus the default configuration file is the `prepare_env.bat` script. If you are running Linux, open the `test_api.py` file and navigate to this section (lines 20-26):
+Tatou's test suite needs a preparation shell script to be run before the tests are executed. This is done automatically by the test suite. Depending on your OS, you may need to select a different script. Open the `test_api.py` module and navigate to this section (lines 20-26):
 
 ```python
 #Run environment preparation file
 print("Preparing the environment...")
 script_dir = Path(__file__).parent
-env_script = script_dir / "prepare_env.bat"
+env_script = script_dir / "prepare_env.sh"
 result = subprocess.run(str(env_script.resolve()), shell=True)
 print("Waiting for db to be ready...")
 sleep(10)
 ```
 
-Replace `"prepare_env.bat"` with `"prepare_env.sh"`. The shell file is already included in the project.
+Choose between `"prepare_env.bat"` and`"prepare_env.sh"` depending on whether you are running Windows or Linux. Both files are already included in the project. The test suite was developed on a Windows machine.
 
 You may also want to change the duration of the sleep function, depending on your machine's processing speed.
 
 The test suite also requires a file named `input.pdf` under `test/storage/files/username`, and a file named `watermarked.pdf` in the same location, watermarked with the Structural and Overlay method. To achieve this, place a PDF file of your choice in the folder (it should not be bigger than 50 Mb), then run `unittest_structural_overlay_watermark.py` once to create the watermarked version (make sure you have installed the necessary dependencies, see below).
 
-Testing the RMAP routes requires a public PGP key and a private PGP key. You will need to place a public key named `Group_13.asc` under `tatou/server/public-keys/pki` and a corresponding private key named `server_priv.asc` under `tatou/server/src`. Then add the private key's password to your `.env` file as follows:
+The RMAP protocol is based on public/private key authentication. You will need your pair of keys for the server as explained in `tatou/README.md`, and you will also need two extra keys to simulate a test entity when running the tests. The keys used for this purpose don't pose a security issue and are already provided in the repository. However, before running, you will need to set up the private keys' passwords in your `.env` file as follows:
 
 ```.env
 PRIVKEY_PASSPHRASE=yourpassword
+TEST_PASSPHRASE=testingtatou
 ```
 
 When you are all set, run the following:
