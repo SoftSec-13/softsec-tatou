@@ -1,0 +1,21 @@
+[cosmic-ray]
+modules = ["observability",
+           "rmap_handler",
+           "robust_xmp_watermark",
+           "server",
+           "signed_annotation_watermark",
+           "simple_rmap",
+           "structural_and_overlay_watermark",
+           "watermarking_method",
+           "watermarking_utils"]
+module-path = "."
+test-command = "pytest ../test/test_api.py ../test/test_watermarking_all_methods.py ../test/test_watermarking_utilities.py"
+baseline = 80
+timeout = 60
+
+[cosmic-ray.distributor]
+name = "local"
+
+[cosmic-ray.runner]
+runner = "local"
+timeout = 60

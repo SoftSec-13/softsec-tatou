@@ -19,6 +19,10 @@ server/src/server_pub.asc
 server/src/server_priv.asc
 server/src/server_pub_external.asc
 
+# Ignore mutation test json files
+server/src/preliminary_session.json
+server/src/session.json
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

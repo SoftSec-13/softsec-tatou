@@ -30,11 +30,11 @@ if not CASES:
 
 # --------- fixtures ----------
 @pytest.fixture(scope="session")
-def sample_pdf_path(tmp_path_factory) -> Path:
-    """Minimal but recognizable PDF bytes."""
-    pdf = tmp_path_factory.mktemp("pdfs") / "sample.pdf"
-    pdf.write_bytes(b"%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF\n")
-    return pdf
+def sample_pdf_path() -> Path:
+    """Sample pdf path."""
+    script_dir = Path(__file__).parent
+    input_path = script_dir / "storage" / "files" / "username" / "input.pdf"
+    return Path(input_path)
 
 
 @pytest.fixture(scope="session")
@@ -45,6 +45,11 @@ def secret() -> str:
 @pytest.fixture(scope="session")
 def key() -> str:
     return "unit-test-key"
+
+
+@pytest.fixture(scope="session")
+def intended_for() -> str:
+    return "unit-test-recipient"
 
 
 def _as_instance(impl: WatermarkingMethod) -> WatermarkingMethod:
