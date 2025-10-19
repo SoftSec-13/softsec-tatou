@@ -112,7 +112,9 @@ sudo docker compose -f docker-compose.prod.yml up -d
 
 1. Open localhost:3000
 2. Login with admin:admin
-3. To view Dashboards, go to Home->Dashboards->Flask Gunicorn Logs & Metrics
+3. To view Dashboards, go to Home->Dashboards
+4. To view Logs, go to either Drilldown->Logs or Explore
+5. To view Metrics, go to either Drilldown->Metrics or Explore
 
 
 
