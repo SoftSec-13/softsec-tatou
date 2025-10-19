@@ -4,7 +4,9 @@
 
 This file illustrates how the server routes are tested and the different cases that are considered. For a full description of each route's specification, please refer to the file `tatou/server/API.md`.
 
-**NOTE:** All routes requiring authentication are tested with mocked authentication, which is initialised via the app configuration variable `"TESTING"=True`.
+**NB:** All routes requiring authentication are tested with mocked authentication, which is initialised via the app configuration variable `"TESTING"=True`.
+
+**NB:** Updates and extra cases that were included after mutation testing are **not** reported in this file. Please refer to the `Mutation Testing Results.md` file in the specialisation-specific deliverables to see those changes.
 
 ## healthz
 
