@@ -1,5 +1,6 @@
 import tempfile
 from pathlib import Path
+from typing import get_type_hints
 from unittest.mock import Mock, patch
 
 import pytest
@@ -55,6 +56,12 @@ class TestWatermarkingUtils:
 
     def test_get_method_with_string(self):
         """Test get_method with string method names."""
+        # Test method's type annotation (added after mutation testing)
+        hints = get_type_hints(WMUtils.get_method)
+        assert "method" in hints
+        assert hints[
+            "method"
+        ]  # force evaluation — this will crash if the annotation is invalid
         # Test valid method names
         for method_name in WMUtils.METHODS.keys():
             method = WMUtils.get_method(method_name)
@@ -100,6 +107,12 @@ class TestWatermarkingUtils:
     def test_is_watermarking_applicable_with_method_name(self, sample_pdf_path):
         """Test is_watermarking_applicable with string method name."""
         method_name = list(WMUtils.METHODS.keys())[0]
+        # Test method's type annotation (added after mutation testing)
+        hints = get_type_hints(WMUtils.is_watermarking_applicable)
+        assert "method" in hints
+        assert hints[
+            "method"
+        ]  # force evaluation — this will crash if the annotation is invalid
 
         result = WMUtils.is_watermarking_applicable(method_name, sample_pdf_path)
 
@@ -118,6 +131,12 @@ class TestWatermarkingUtils:
     def test_apply_watermark_with_method_name(self, sample_pdf_path):
         """Test apply_watermark with string method name."""
         method_name = list(WMUtils.METHODS.keys())[0]
+        # Test method's type annotation (added after mutation testing)
+        hints = get_type_hints(WMUtils.apply_watermark)
+        assert "method" in hints
+        assert hints[
+            "method"
+        ]  # force evaluation — this will crash if the annotation is invalid
 
         # Only test if method is applicable
         if WMUtils.is_watermarking_applicable(method_name, sample_pdf_path):
