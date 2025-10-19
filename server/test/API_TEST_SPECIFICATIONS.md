@@ -6,7 +6,7 @@ This file illustrates how the server routes are tested and the different cases t
 
 **NB:** All routes requiring authentication are tested with mocked authentication, which is initialised via the app configuration variable `"TESTING"=True`.
 
-**NB:** Updates and extra cases that were included after mutation testing are **not** reported in this file. Please refer to the `Mutation Testing Results.md` file in the specialisation-specific deliverables to see those changes.
+**NB:** Updates and extra cases that were included after mutation testing are **not** reported in this file. Please refer to the `Mutation Testing Results.pdf` file in the specialisation-specific deliverables to see those changes.
 
 ## healthz
 
