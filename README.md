@@ -3,7 +3,7 @@ A web platform for pdf watermarking. This project is intended for pedagogical us
 
 ## Instructions
 
-The following instructions are meant for a bash terminal on a Linux machine. If you are using something else, you will need to adapt them.
+The following instructions are meant for a bash terminal on a Linux machine, unless differently specified. If you are using something else, you will need to adapt them.
 
 To clone the repo, you can simply run:
 
@@ -13,7 +13,9 @@ git clone https://github.com/nharrand/tatou.git
 
 Note that you should probably for the repo and clone your own repo.
 
-### Run python unit tests
+### Run the test suite (unit, integration, coverage)
+
+Tatou features a comprehensive test suite for its API and watermarking methods. You may need to configure the test suite to work properly on your machine (see **[server/test/TEST_README.md](server/test/TEST_README.md)** for details). Here is a quick summary of the bash commands to run the tests (assuming the test suite and environment is properly set up).
 
 ```bash
 cd tatou/server
@@ -27,11 +29,21 @@ python3 -m venv .venv
 # Install the necessary dependencies
 python -m pip install -e ".[dev]"
 
-# Run the unit tests
-python -m pytest
+# Run all the tests
+python -m pytest /test
+
+# Run a specific test file
+python -m pytest /test/<filename>.py
+
+# See verbose output and output of print functions
+python -m pytest -s -vv /test
+
+# Perform coverage testing (you may need to install the cov plugin for pytest)
+python -m pytest --cov=src /test
 ```
 
 ### Enable pre-commit
+
 ```bash
 # Activate your virtual environement
 . .venv/bin/activate
