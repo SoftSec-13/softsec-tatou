@@ -60,6 +60,12 @@ def test_healthz_route(client):
     assert resp.status_code == 200  # nosec B101
     assert resp.is_json  # nosec B101
 
+    # Added after mutation testing
+    # Test the db_ok return value in the message
+    resp_data = resp.get_json()
+    assert isinstance(resp_data.get("db_connected"), bool)
+    assert resp_data.get("db_connected")
+
 
 def test_create_user_route(client):
     """Test user creation endpoint."""
@@ -114,6 +120,33 @@ def test_create_user_route(client):
         json={
             "email": "malformedemail",
             "login": "username",
+            "password": "password",  # nosec B106
+        },
+    )
+    assert resp.status_code == 400
+
+    # Added after mutation testing
+    # Test with no parameters at all
+    resp = client.post("/api/create-user")
+    assert resp.status_code == 400
+
+    # Test with too long username
+    resp = client.post(
+        "/api/create-user",
+        json={
+            "email": "user@email.se",
+            "login": "a" * 65,
+            "password": "password",  # nosec B106
+        },
+    )
+    assert resp.status_code == 400
+
+    # Test with too long email
+    resp = client.post(
+        "/api/create-user",
+        json={
+            "email": "a" * 321,
+            "login": "user",
             "password": "password",  # nosec B106
         },
     )
@@ -230,6 +263,80 @@ def test_upload_document_route(client):
     )
     assert resp.status_code == 415
 
+    # Added after mutation testing
+    # Test with missing filename in file object
+    resp = client.post(
+        "/api/upload-document",
+        data={"file": (BytesIO(b"%PDF-1.4\n%Fake PDF\n")), "name": "file"},
+        content_type="multipart/form-data",
+    )
+    assert resp.status_code == 400
+
+    # Test with different formats
+    # jpg
+    resp = client.post(
+        "/api/upload-document",
+        data={
+            "file": (
+                BytesIO(b"\xff\xd8\xff\xe0" + b"\x00" * 100),  # JPEG header
+                "test.jpg",
+                "image/jpeg",
+            ),
+            "name": "file",
+        },
+        content_type="multipart/form-data",
+    )
+    assert resp.status_code == 415
+
+    # png
+    resp = client.post(
+        "/api/upload-document",
+        data={
+            "file": (
+                BytesIO(b"\x89PNG\r\n\x1a\n" + b"\x00" * 100),  # PNG header
+                "test.png",
+                "image/png",
+            ),
+            "name": "file",
+        },
+        content_type="multipart/form-data",
+    )
+    assert resp.status_code == 415
+
+    # doc
+    resp = client.post(
+        "/api/upload-document",
+        data={
+            "file": (
+                BytesIO(
+                    b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" + b"\x00" * 100
+                ),  # DOC file magic number
+                "test.doc",
+                "application/msword",
+            ),
+            "name": "file",
+        },
+        content_type="multipart/form-data",
+    )
+    assert resp.status_code == 415
+
+    # odt
+    resp = client.post(
+        "/api/upload-document",
+        data={
+            "file": (
+                BytesIO(
+                    b"PK\x03\x04" + b"\x00" * 100
+                ),  # ODT is a ZIP file (OpenDocument)
+                "test.odt",
+                "application/vnd.oasis.opendocument.text",
+            ),
+            "name": "file",
+        },
+        content_type="multipart/form-data",
+    )
+    assert resp.status_code == 415
+
 
 def test_list_documents_route(client):
     """Test document list endpoint."""
@@ -337,6 +444,17 @@ def test_get_document_route(client):
     # Test with wrong parameters (missing file)
     resp = client.get("/api/get-document", query_string={"documentid": 4})
     assert resp.status_code == 404
+
+    # Added after mutation testing
+    # Test with documentid = 0
+    resp = client.get("/api/get-document", query_string={"documentid": 0})
+    assert resp.status_code == 400
+    # Test with documentid < 0
+    resp = client.get("/api/get-document", query_string={"documentid": -1})
+    assert resp.status_code == 400
+    # Test with documentid > MAX_DB_INT
+    resp = client.get("/api/get-document", query_string={"documentid": (2**63)})
+    assert resp.status_code == 400
 
 
 def test_get_watermarking_methods_route(client):
@@ -601,6 +719,11 @@ def test_delete_document_route(client):
     # Test missing file
     resp = client.delete("/api/delete-document/2")
     assert resp_deletion.status_code == 404
+
+    # Added after mutation testing
+    # Test with the POST call
+    resp = client.post("/api/delete-document", json={"id": 1})
+    assert resp.status_code == 200
 
 
 # Helpers for RMAP routes test
